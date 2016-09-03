@@ -11,9 +11,15 @@ from nltk.stem.snowball import SnowballStemmer
 import math
 from decimal import *
 
+#global variables (P(class))
+prob_class_pos = 0
+prob_class_neut = 0
+prob_class_neg = 0
+
 #function to process twitter data (for usage without professional sentiment lexicon --> with stemming)
 def process(data):           
     """
+    We have three data sets (csvfiles) of twitter data containing the sentiment, date, tweet and hashtags.
     Before we can analyize our data, we need to process it.
     This includes:
         - converting all words to lowercase
@@ -28,7 +34,7 @@ def process(data):
     data_list = []                                                  
     punctuation =   ['.', ',', ';', '!', '?', '(', ')', '[', ']',                       #list of english punctuation marks (used in tweets)
                     '&', ':', '-', '/', '\\', '$', '*', '"', "'", '+',
-                    '=', '@', '%', '~']                                      
+                    '=', '@', '%', '~', '{', '}', '|']                                      
     stopwords = nltk.corpus.stopwords.words("english")                                  #list of stopwords
     
     with open(data, 'r') as csvfile:                                                    #collect tweets from csv-data in list
@@ -114,7 +120,7 @@ def make_dictionary(data, data_list):
     return data_dict
     
 #function to make a sentiment-lexicon based on twitter data
-def make_sentiment_lexicon(data, data_list, data_dict):
+def make_sentiment_lexicon(data_list, data_dict):
     """
     To make a sentiment lexicon we need:
         - a lexicon of all words (word_lexicon)
@@ -122,9 +128,9 @@ def make_sentiment_lexicon(data, data_list, data_dict):
         - the number of times a word occurs in a positive, neutral or negative tweet (pos, neut, neg)
         - the size of the word_lexicon
     
-    With this we can estimate P(w|class) with Laplace Smoothing for all three classes. For the positive class this means:
-        - w being pos + 1
-        - class being words_in pos_tweet + size of word_lexicon
+    With this we can estimate P(w|class) (without Laplace Smoothing) for all three classes. For the positive class this means:
+        - w being pos
+        - class being words_in pos_tweet
     
     The results will be written in a txtfile (our sentiment lexicon), looking like this:
         word    P(word|pos)    P(word|neut)    P(word|neg)
@@ -161,6 +167,17 @@ def make_sentiment_lexicon(data, data_list, data_dict):
             for word in key:
                 words_in_neg_tweets +=1
     
+    number_tweets = pos_tweet_count + neut_tweet_count + neg_tweet_count                #number of tweets
+    
+    #estimate P(class)
+    global prob_class_pos
+    prob_class_pos = round((Decimal(pos_tweet_count) / number_tweets),5)
+    global prob_class_neut 
+    prob_class_neut = round((Decimal(neut_tweet_count) / number_tweets), 5)
+    global prob_class_neg
+    prob_class_neg = round((Decimal(neg_tweet_count) / number_tweets), 5)
+    
+    
     #make sentiment-lexicon
     file = open("sentiment_lexicon.txt", "w")
     for word in word_lexicon:
@@ -176,15 +193,111 @@ def make_sentiment_lexicon(data, data_list, data_dict):
                 else:
                     neg += 1
         
-        p_w_pos = ((pos + 1) / Decimal(words_in_pos_tweets + size_lexicon)) * 1000      #p(w|class) will be multiplied by 1000 to have easier numbers to work with
+        """
+        #With Laplace-Smoothing - Will not be used as it caused problems (favorited uncommon class (negative))
+        p_w_pos = ((pos + 1) / Decimal(words_in_pos_tweets + size_lexicon)) * 1000      
         p_w_neut = ((neut + 1) / Decimal(words_in_neut_tweets + size_lexicon)) * 1000
         p_w_neg = ((neg + 1) / Decimal(words_in_neg_tweets + size_lexicon)) * 1000
+        """
         
-        #print round(p_w_pos,5), round(p_w_neut), round(p_w_neg)
         
-        file.write(word + " " + str(round(p_w_pos,5)) + " " + str(round(p_w_neut, 5)) + " " + str(round(p_w_neg, 5)) + "\n")
+        #Without Laplace-Smoothing
+        if pos != 0:
+            p_w_pos = pos / Decimal(words_in_pos_tweets) * 1000                         #P(w|class) will be multiplied by 1000 to have easier numbers to work with
+        else:
+            p_w_pos = 0                                                                 #for unseen class-word-occurence, the weight will be 1 (as 1 is neutral for multiplication)
+        if neut != 0:
+            p_w_neut = neut / Decimal(words_in_neut_tweets) * 1000                         
+        else:
+            p_w_neu = 0
+        if neg != 0:
+            p_w_neg = neg / Decimal(words_in_neg_tweets) * 1000                         
+        else:
+            p_w_neg = 0
+        
+        
+        file.write(word + " " + str(round(p_w_pos,3)) + " " + str(round(p_w_neut, 3)) + " " + str(round(p_w_neg, 3)) + "\n")
     file.close()
+
+#function to implement Naive Bayes algorithm
+def do_naive_bayes(sentiment_lexicon, data_list, filename):
+    """
+    We use the Naive Bayes algorithm to determine the sentiment of each tweet.
+    We work with our data_list containing all stemmed and processed tweets and our sentiment_lexicon.
     
+    For Naive Bayes we need to:
+        - estimate P(class|tweet) for every class (positive, neutral, negative) and every tweet
+        - compare the probabilites to find greatest probability and therefore the most suitable sentiment
+        - save the tweet with the respective sentiment in a csv-file (to later compare it with the manual sentiments)
+    
+    P(tweet|class) = P(w1|class) * P(w2|class) * ... * P(wn|class)
+    
+    Then we have to estimate P(class|tweet) by multiplying P(tweet|class) with P(class), which is
+    determined by the number of positive, neutral and negative tweets in our data.
+    """
+    
+    #results when using naive bayes algorithm will be saved as a csvfile
+    with open(filename, 'wb') as new_file:
+        writer = csv.writer(new_file, delimiter=';')
+        for entry in data_list:
+            p_tweet_pos = 1                                                                 #P(tweet|class)
+            p_tweet_neut = 1
+            p_tweet_neg = 1
+            values = []
+            sentiment = ""
+            for word in entry:
+                for line in open(sentiment_lexicon):
+                    if word in line:
+                        line_split = line.split()
+                        if line_split[1] != "0.0":
+                            p_tweet_pos *= Decimal(line_split[1])
+                        else:
+                            p_tweet_pos *= Decimal(0.025)                                   #multiply by a low weight to get best result with unseen word-class-occurences
+                        if line_split[2] != "0.0":
+                            p_tweet_neut *= Decimal(line_split[2])
+                        else:
+                            p_tweet_neut *= Decimal(0.025)
+                        if line_split[3] != "0.0":
+                            p_tweet_neg *= Decimal(line_split[3])
+                        else:
+                            p_tweet_neg *= Decimal(0.025)
+            if p_tweet_pos != 1:
+                pos_value = float(p_tweet_pos) * prob_class_pos                             #P(class|tweet)
+            else:
+                pos_value = 0
+            if p_tweet_neut != 1:
+                neut_value = float(p_tweet_neut) * prob_class_neut
+            else:
+                neut_value = 0
+            if p_tweet_neg != 1:
+                neg_value = float(p_tweet_neg) * prob_class_neg
+            else:
+                neg_value = 0
+            values = [pos_value, neut_value, neg_value]
+            if max(values) == values[0]:                                                    #determine sentiment (max P(class|tweet))
+                sentiment = "positive"
+            elif max(values) == values[1]:
+                sentiment = "neutral"
+            else:
+                sentiment = "negative"
+            tweet = ""
+            for word in entry:
+                tweet = tweet + word + " "
+            writer.writerow([sentiment, tweet])                                             #write sentiment and tweet in csvfile
+        
+#function to implement Maximum Entropy Model algorithm
+def do_max_ent(sentiment_lexicon, data_list, filename):
+    """
+    We use the Maximum Entropy Model algorithm to determine the sentiment of each tweet.
+    We work with our data_list containing all stemmed and processed tweets and our sentiment_lexicon.
+    
+    For MEM we need to estimate the weighted feature sum for each class (positive, neutral, negative) and every tweet.
+    For this we need to add up the weigths from our sentiment-lexicon.
+    
+    The weighted feature sums will be used in the MEM-algorithms. For example, for the positive class it's estimated like this:
+        P(class|tweet) = e(pos_feature_sum) divided by (e(pos_feature_sum) + e(neut_feature_sum) + e(neg_feature_sum))
+    """
+      
 if __name__ == "__main__":
     #process data of all three data sets
     data_list_before = process('data/comiccon_before_classified.csv')
@@ -201,4 +314,34 @@ if __name__ == "__main__":
     data_dict_joined = dict(data_dict_before.items() + data_dict_during.items() + data_dict_after.items())
     
     #create sentiment lexicon (txtfile) based on twitter data
-    make_sentiment_lexicon('data/comiccon_before_classified.csv', data_list_joined, data_dict_joined)
+    make_sentiment_lexicon(data_list_joined, data_dict_joined)
+    
+    #do_naive_bayes('sentiment_lexicon.txt', data_list_before, 'sentiment_before_naive_bayes.csv')
+    #do_max_ent('sentiment_lexicon.txt', data_list_before, 'sentiment_before_max_ent.csv')
+    
+    """
+    #Test to determine how many words are mostly positive / neutral / negative --> Everthing is as expected
+    values = [1,1,2]
+    pos = 0
+    neut = 0
+    neg = 0
+    for line in open("sentiment_lexicon.txt"):
+        line_split = line.split()
+        values[0] = line_split[1]
+        values[1] = line_split[2]
+        values[2] = line_split[3]
+        if max(values) == values[0]:
+            pos += 1
+            print "positive"
+        elif max(values) == values[1]:
+            neut += 1
+            print "neutral"
+        else:
+            neg += 1
+            print "negative"
+    print pos, neut, neg
+    """
+
+        
+        
+
