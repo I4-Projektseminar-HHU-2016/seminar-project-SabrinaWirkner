@@ -55,20 +55,6 @@ def process(data):
             element[i] = str(word)
             
         data_list[index] = element
-    
-    """
-    with open(data, 'r') as csvfile:                                                    #tried to write processed tweets in csvfile
-        reader = csv.reader(csvfile, delimiter=';')
-        for row in reader:
-            new_row = []
-            for el in row:
-                for word in element:
-                    new_row.append(word)
-                    new_row.append(" ")
-        
-            with open('data/processed_comiccon_before_classified.csv', 'a') as csvfile:
-                writer = csv.writer(csvfile, delimiter=';')
-                writer.writerow(new_row)"""
         
     return data_list
 
@@ -297,7 +283,157 @@ def do_max_ent(sentiment_lexicon, data_list, filename):
     The weighted feature sums will be used in the MEM-algorithms. For example, for the positive class it's estimated like this:
         P(class|tweet) = e(pos_feature_sum) divided by (e(pos_feature_sum) + e(neut_feature_sum) + e(neg_feature_sum))
     """
-      
+    
+    #results when using MEM algorithm will be saved as a csvfile
+    with open(filename, 'wb') as new_file:
+        writer = csv.writer(new_file, delimiter=';')
+        for entry in data_list:
+            pos_feature_sum = 0                                                                 #weighted feature sums
+            neut_feature_sum = 0
+            neg_feature_sum = 0
+            sentiment = ""
+            for word in entry:
+                for line in open(sentiment_lexicon):
+                    if word in line:
+                        line_split = line.split()
+                        pos_feature_sum += Decimal(line_split[1])
+                        neut_feature_sum += Decimal(line_split[2])
+                        neg_feature_sum += Decimal(line_split[3])
+            #estimating P(class|tweet)
+            p_pos_tweet = math.e**(float(pos_feature_sum)) / (math.e**(float(pos_feature_sum)) + math.e**(float(neut_feature_sum)) + math.e**(float(neg_feature_sum)))
+            p_neut_tweet = math.e**(float(neut_feature_sum)) / (math.e**(float(pos_feature_sum)) + math.e**(float(neut_feature_sum)) + math.e**(float(neg_feature_sum)))
+            p_neg_tweet = math.e**(float(neg_feature_sum)) / (math.e**(float(pos_feature_sum)) + math.e**(float(neut_feature_sum)) + math.e**(float(neg_feature_sum)))
+            values = [p_pos_tweet, p_neut_tweet, p_neg_tweet]
+            if max(values) == values[0]:                                                        #determine sentiment (max P(class|tweet))
+                sentiment = "positive"
+            elif max(values) == values[1]:
+                sentiment = "neutral"
+            else:
+                sentiment = "negative"
+            tweet = ""
+            for word in entry:
+                tweet = tweet + word + " "
+            writer.writerow([sentiment, tweet])                                             #write sentiment and tweet in csvfile
+
+#function to implement Support Vector Machina / k-nearest Neighbour algorithm
+def do_svm(sentiment_lexicon, data_list, data_dict, filename):
+    """
+    We use the Support Vector Machine / k-nearest Neighbour algorithm to determine the sentiment of each tweet.
+    We work with our data_list containing all stemmed and processed tweets and our sentiment_lexicon.
+    
+    First we need to estimate the vectors for each tweet. The values of the vector are the number of times each word of our lexicon appears in our tweet.
+    Then we compare for each tweet its vector with all other vector to find the ones most similar. To do this, we need to estimate the normalized dot product.
+    
+    The sentiment of our tweet is estimated by the (intellectually assigned) sentiment of the k tweets with the most similar vector
+    (k=3 or k=5, whichever gets the better results).
+    """
+    
+    #create a list of lists (term_tweet_matrix) representing the vectors of each tweet
+    term_tweet_matrix = []
+    for tweet in data_list:
+        vec_tweet = []
+        for line in open(sentiment_lexicon):
+            line_split = line.split()
+            n = 0
+            m = 0
+            if line_split[0] in tweet:
+                while m < len(tweet):
+                    if line_split[0] == tweet[m]:
+                        n += 1
+                        m += 1
+                    else:
+                        m += 1
+            vec_tweet.append(n)
+        term_tweet_matrix.append(vec_tweet)
+    
+    #results when using SVM algorithm will be saved as a csvfile
+    with open(filename, 'wb') as new_file:
+        writer = csv.writer(new_file, delimiter=';')
+        for init_vector in term_tweet_matrix:                                                       #estimate distances between all the vectors
+            distances = []
+            vec_len_first = 0
+            for value in init_vector:
+                vec_len_first = vec_len_first + value**(2)
+            vec_len = math.sqrt(vec_len_first)                                                      #length of vector
+            for vector in term_tweet_matrix:
+                vec2_len_first = 0
+                for value in vector:
+                    vec2_len_first = vec2_len_first + value**(2)
+                vec2_len = math.sqrt(vec2_len_first)                                                #length of vector we want to compare
+                dot_product_first = 0
+                i = 0
+                while i < len(init_vector):
+                    dot_product_first = dot_product_first + init_vector[i] * vector[i]
+                    i += 1
+                dot_product = dot_product_first / (vec_len * vec2_len)                              #normalized dot product
+                distances.append(dot_product)                                                       #save all dot products into a list
+            
+            #find the 3 most similar vectors for our initial vector
+            k1 = distances.index(max(distances))                                                    #k1 will be ignored here, but used later as it is the dot product with our inital vector (=1)
+            distances[k1] = 0           
+            k2 = distances.index(max(distances))
+            distances[k2] = 0
+            k3 = distances.index(max(distances))
+            distances[k3] = 0
+            k4 = distances.index(max(distances))
+            tweet1 = ""
+            tweet2 = ""
+            tweet3 = ""
+            for word in data_list[k2]:
+                tweet1 = tweet1 + word + " "
+            for word in data_list[k3]:
+                tweet2 = tweet2 + word + " "
+            for word in data_list[k4]:
+                tweet3 = tweet3 + word + " "
+            sentiments = []
+            for key in data_dict:                                                                   #find the sentiments of the tweets corresponding to the most similar vectors
+                if tweet1 == key:
+                    sentiments.append(data_dict[key])
+                elif tweet2 == key:
+                    sentiments.append(data_dict[key])
+                elif tweet3 == key:
+                    sentiments.append(data_dict[key])
+            pos = sentiments.count("positiv")
+            neut = sentiments.count("neutral")
+            neg = sentiments.count("negativ")
+            sentiment = ""
+            if pos == max([pos,neut,neg]):
+                sentiment = "positiv"
+            if neut == max([pos,neut,neg]):
+                sentiment = "neutral"
+            if neg == max([pos,neut,neg]):
+                sentiment = "negativ"
+            tweet = ""
+            for word in data_list[k1]:
+                tweet = tweet + word + " "
+            writer.writerow([sentiment, tweet])
+
+#function to implement Pointwise Mutual Information algorithm to estimate new weights
+def do_pmi(sentiment_lexicon, data_list):
+    """
+    We use the Pointwise Mutual Information algorithm to determine new weights for our sentiment lexicon,
+    which can then be used for our other methods (Naive Bayes, MEM, SVM).
+    
+    First we have to create a word-word-matrix of our lexicon, which displays how often words occur with each other.
+    Usually a distance of around 4 words is used, but as we only have little data, we will count how often a word
+    occurs with another word in a tweet.
+    
+    Based on this matrix we can estimate P(w) (word), P(c) (context-word) and P(w|c),
+    which can be used for the PMI algorithm.
+    
+    We will use our original sentiment lexicon, than add to the weight of a word the weight of all other words multiplied by the estimated PMI between them.
+    So if we have:
+        great       1,5    0,8    0,02
+        excellent   1,7    0,6    0,2
+    And we have the PMI(great, excellent) = 0,6, we will do:
+        great       1,5+0,6*1,7   0,8+0,6*0,6    + 0,02+0,6*0,2
+    etc.
+
+    The new sentiment lexicon will contain all words and their positive, neutral and negative weights:
+        word    P(word|pos)    P(word|neut)    P(word|neg)
+    """
+    return
+    
 if __name__ == "__main__":
     #process data of all three data sets
     data_list_before = process('data/comiccon_before_classified.csv')
@@ -318,29 +454,8 @@ if __name__ == "__main__":
     
     #do_naive_bayes('sentiment_lexicon.txt', data_list_before, 'sentiment_before_naive_bayes.csv')
     #do_max_ent('sentiment_lexicon.txt', data_list_before, 'sentiment_before_max_ent.csv')
-    
-    """
-    #Test to determine how many words are mostly positive / neutral / negative --> Everthing is as expected
-    values = [1,1,2]
-    pos = 0
-    neut = 0
-    neg = 0
-    for line in open("sentiment_lexicon.txt"):
-        line_split = line.split()
-        values[0] = line_split[1]
-        values[1] = line_split[2]
-        values[2] = line_split[3]
-        if max(values) == values[0]:
-            pos += 1
-            print "positive"
-        elif max(values) == values[1]:
-            neut += 1
-            print "neutral"
-        else:
-            neg += 1
-            print "negative"
-    print pos, neut, neg
-    """
+    #do_svm('sentiment_lexicon.txt', data_list_before, data_dict_before, 'sentiment_before_svm.csv')
+    do_pmi('sentiment_lexicon.txt', data_list_before)
 
         
         
