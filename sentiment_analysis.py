@@ -418,6 +418,15 @@ def do_pmi(sentiment_lexicon, data_list):
     Usually a distance of around 4 words is used, but as we only have little data, we will count how often a word
     occurs with another word in a tweet.
     
+    The counts in the word-word-matrix will be replaced with joint probabilities. They are estimated as follows:
+        count of contextword with word / counts of all contextwords with word
+        multiplied with
+        count of all contextwords with word / counts of all contextwords with all words
+    For example you have the word "apple" and the contextword "pie". "apple" occurs 2 times with "pie" and 5 times in total with contextwords.
+    All in all 32 occurences of words with contextwords are counted (only count either (apple | pie) or (pie | apple).
+    So our algorithm for joint probability would be:
+        (2 / 5) * (5 / 32)
+    
     Based on this matrix we can estimate P(w) (word), P(c) (context-word) and P(w|c),
     which can be used for the PMI algorithm.
     
@@ -432,8 +441,111 @@ def do_pmi(sentiment_lexicon, data_list):
     The new sentiment lexicon will contain all words and their positive, neutral and negative weights:
         word    P(word|pos)    P(word|neut)    P(word|neg)
     """
-    return
     
+    vocab_list = []                                                                         #list of vocabulary in lexicon
+    for line in open(sentiment_lexicon):
+        line_split = line.split()
+        vocab_list.append(line_split[0])
+
+    #create word_word_matrix
+    word_word_matrix = []
+    for tweet in data_list:
+        for word in tweet:
+            word_contextword = []
+            for words in data_list:
+                if word in words:
+                    for voc in words:
+                        if voc != word:
+                            word_contextword.append(voc)                                    #list of all words occuring together with initial word in tweets
+            word_contextword_dict = {}                                                      #dictionary of contextwords and their number of occurences with initial word
+            for element in word_contextword:
+                word_contextword_dict[element] = word_contextword.count(element)
+            word_contextword_list = []                                                      #list of occurences of initial word with all other words
+            for vocab in vocab_list:
+                if vocab in word_contextword_dict.keys():
+                    word_contextword_list.append(word_contextword_dict[vocab])
+                else:
+                    word_contextword_list.append(0)
+            word_word_matrix.append(word_contextword_list)                                  #list of word_contextword_lists for all words in our vocabulary
+    
+    #replace counts in word_word_matrix with joint probabilities
+    all_counts = 0
+    n = 0
+    for element in word_word_matrix:
+        for index, value in enumerate(element):
+            if index >= n:
+                all_counts += value
+        n += 1
+    joint_probability = 0
+    for entry in word_word_matrix:
+        all_contextword_counts = 0
+        for value in entry:
+            all_contextword_counts += value
+        for i, element in enumerate(entry):
+            if entry[i] != 0:
+                joint_probability = (entry[i] / Decimal(all_contextword_counts)) * (all_contextword_counts / Decimal(all_counts))
+            else:
+                joint_probability = 0
+            entry[i] = joint_probability
+
+    #make a list for all words and their P(w) and P(c)
+    probability_lists = []
+    for i, entry in enumerate(word_word_matrix):
+        voc = vocab_list[i]
+        p_w = 0
+        for value in entry:
+            p_w += value
+        p_c = 0
+        for element in word_word_matrix:
+            p_c += element[0]
+        probability_list = [voc, p_w, p_c]
+        probability_lists.append(probability_list)
+    
+    #make ppmi_matrix containing all ppmi-values for all words with all other words
+    ppmi_matrix = []
+    for i, entry in enumerate(word_word_matrix):
+        ppmi_list = []
+        for element in entry:
+            word = probability_lists[i]
+            p_w = word[1]
+            p_c = word[2]
+            if p_w != 0 and p_c != 0:
+                x = element / Decimal((p_w * p_c))
+                if x != 0:
+                    pmi = math.log(x, 2)
+                else:
+                    pmi = 0
+            else:
+                pmi = 0
+            ppmi = max(pmi, 0)
+            ppmi_list.append(ppmi)
+        ppmi_matrix.append(ppmi_list)
+
+    file = open("sentiment_lexicon_pmi.txt", "w")
+    word = ""
+    p_w_pos = 0
+    p_w_neut = 0
+    p_w_neg = 0
+    for i, line in enumerate(open(sentiment_lexicon)):
+        line_split = line.split()
+        word = line_split[0]
+        p_w_pos = line_split[1]
+        p_w_neut = line_split[2]
+        p_w_neg = line_split[3]
+        for index, element in enumerate(ppmi_matrix[i]):
+            if element != 0:
+                f = open(sentiment_lexicon)
+                lines = f.readlines()
+                cword = lines[index]
+                pos = element * float(cword[1])
+                neut = element * float(cword[2])
+                neg = element * float(cword[3])
+                p_w_pos += pos
+                p_w_neut += neut
+                p_w_neg += neg
+        file.write(word + " " + str(round(p_w_pos,3)) + " " + str(round(p_w_neut, 3)) + " " + str(round(p_w_neg, 3)) + "\n")
+    file.close()
+
 if __name__ == "__main__":
     #process data of all three data sets
     data_list_before = process('data/comiccon_before_classified.csv')
@@ -456,7 +568,6 @@ if __name__ == "__main__":
     #do_max_ent('sentiment_lexicon.txt', data_list_before, 'sentiment_before_max_ent.csv')
     #do_svm('sentiment_lexicon.txt', data_list_before, data_dict_before, 'sentiment_before_svm.csv')
     do_pmi('sentiment_lexicon.txt', data_list_before)
-
         
         
 
