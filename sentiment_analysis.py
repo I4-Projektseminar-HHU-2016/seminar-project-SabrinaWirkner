@@ -300,9 +300,18 @@ def do_max_ent(sentiment_lexicon, data_list, filename):
                         neut_feature_sum += Decimal(line_split[2])
                         neg_feature_sum += Decimal(line_split[3])
             #estimating P(class|tweet)
-            p_pos_tweet = math.e**(float(pos_feature_sum)) / (math.e**(float(pos_feature_sum)) + math.e**(float(neut_feature_sum)) + math.e**(float(neg_feature_sum)))
+            e = Decimal(math.e)
+            e_pos_feature_sum = e**(Decimal(pos_feature_sum))
+            e_neut_feature_sum = e**(Decimal(neut_feature_sum))
+            e_neg_feature_sum = e**(Decimal(neg_feature_sum))
+            p_pos_tweet = Decimal(e_pos_feature_sum) / Decimal(e_pos_feature_sum + e_neut_feature_sum + e_neg_feature_sum)
+            p_neut_tweet = Decimal(e_neut_feature_sum) / Decimal(e_pos_feature_sum + e_neut_feature_sum + e_neg_feature_sum)
+            p_neg_tweet = Decimal(e_neg_feature_sum) / Decimal(e_pos_feature_sum + e_neut_feature_sum + e_neg_feature_sum)
+            """
+            p_pos_tweet = Decimal(math.e**(float(pos_feature_sum))) / Decimal((math.e**(float(pos_feature_sum))) + math.e**(float(neut_feature_sum)) + math.e**(float(neg_feature_sum)))
             p_neut_tweet = math.e**(float(neut_feature_sum)) / (math.e**(float(pos_feature_sum)) + math.e**(float(neut_feature_sum)) + math.e**(float(neg_feature_sum)))
             p_neg_tweet = math.e**(float(neg_feature_sum)) / (math.e**(float(pos_feature_sum)) + math.e**(float(neut_feature_sum)) + math.e**(float(neg_feature_sum)))
+            """
             values = [p_pos_tweet, p_neut_tweet, p_neg_tweet]
             if max(values) == values[0]:                                                        #determine sentiment (max P(class|tweet))
                 sentiment = "positive"
@@ -313,7 +322,7 @@ def do_max_ent(sentiment_lexicon, data_list, filename):
             tweet = ""
             for word in entry:
                 tweet = tweet + word + " "
-            writer.writerow([sentiment, tweet])                                             #write sentiment and tweet in csvfile
+            writer.writerow([sentiment, tweet])                                                 #write sentiment and tweet in csvfile
 
 #function to implement Support Vector Machina / k-nearest Neighbour algorithm
 def do_svm(sentiment_lexicon, data_list, data_dict, filename):
@@ -349,6 +358,7 @@ def do_svm(sentiment_lexicon, data_list, data_dict, filename):
     #results when using SVM algorithm will be saved as a csvfile
     with open(filename, 'wb') as new_file:
         writer = csv.writer(new_file, delimiter=';')
+        n = 1
         for init_vector in term_tweet_matrix:                                                       #estimate distances between all the vectors
             distances = []
             vec_len_first = 0
@@ -365,7 +375,10 @@ def do_svm(sentiment_lexicon, data_list, data_dict, filename):
                 while i < len(init_vector):
                     dot_product_first = dot_product_first + init_vector[i] * vector[i]
                     i += 1
-                dot_product = dot_product_first / (vec_len * vec2_len)                              #normalized dot product
+                if vec_len != 0 and vec2_len != 0:
+                    dot_product = dot_product_first / (vec_len * vec2_len)                          #normalized dot product
+                else:
+                    dot_product = 0
                 distances.append(dot_product)                                                       #save all dot products into a list
             
             #find the 3 most similar vectors for our initial vector
@@ -407,6 +420,8 @@ def do_svm(sentiment_lexicon, data_list, data_dict, filename):
             for word in data_list[k1]:
                 tweet = tweet + word + " "
             writer.writerow([sentiment, tweet])
+            print n
+            n += 1
 
 #function to implement Pointwise Mutual Information algorithm to estimate new weights
 def do_pmi(sentiment_lexicon, data_list):
@@ -446,10 +461,15 @@ def do_pmi(sentiment_lexicon, data_list):
     for line in open(sentiment_lexicon):
         line_split = line.split()
         vocab_list.append(line_split[0])
+    
+    print len(vocab_list)
+    print len(data_list)
 
     #create word_word_matrix
     word_word_matrix = []
+    n = 1
     for tweet in data_list:
+        print n
         for word in tweet:
             word_contextword = []
             for words in data_list:
@@ -467,6 +487,9 @@ def do_pmi(sentiment_lexicon, data_list):
                 else:
                     word_contextword_list.append(0)
             word_word_matrix.append(word_contextword_list)                                  #list of word_contextword_lists for all words in our vocabulary
+        n += 1
+    
+    print len(word_word_matrix)
     
     #replace counts in word_word_matrix with joint probabilities
     all_counts = 0
@@ -487,6 +510,8 @@ def do_pmi(sentiment_lexicon, data_list):
             else:
                 joint_probability = 0
             entry[i] = joint_probability
+    
+    print len(word_word_matrix)
 
     #make a list for all words and their P(w) and P(c)
     probability_lists = []
@@ -500,6 +525,8 @@ def do_pmi(sentiment_lexicon, data_list):
             p_c += element[0]
         probability_list = [voc, p_w, p_c]
         probability_lists.append(probability_list)
+    
+    print len(word_word_matrix)
     
     #make ppmi_matrix containing all ppmi-values for all words with all other words
     ppmi_matrix = []
@@ -520,6 +547,8 @@ def do_pmi(sentiment_lexicon, data_list):
             ppmi = max(pmi, 0)
             ppmi_list.append(ppmi)
         ppmi_matrix.append(ppmi_list)
+    
+    print len(ppmi_matrix)
 
     file = open("sentiment_lexicon_pmi.txt", "w")
     word = ""
@@ -529,22 +558,57 @@ def do_pmi(sentiment_lexicon, data_list):
     for i, line in enumerate(open(sentiment_lexicon)):
         line_split = line.split()
         word = line_split[0]
-        p_w_pos = line_split[1]
-        p_w_neut = line_split[2]
-        p_w_neg = line_split[3]
+        p_w_pos = float(line_split[1])
+        p_w_neut = float(line_split[2])
+        p_w_neg = float(line_split[3])
         for index, element in enumerate(ppmi_matrix[i]):
+            if index == 0:
+                print index, i
+            elif index == 3707:
+                print index, i
             if element != 0:
                 f = open(sentiment_lexicon)
                 lines = f.readlines()
-                cword = lines[index]
-                pos = element * float(cword[1])
-                neut = element * float(cword[2])
-                neg = element * float(cword[3])
+                cword = lines[index].split()
+                pos_weight = float(cword[1])
+                neut_weight = float(cword[2])
+                neg_weight = float(cword[3])
+                pos = element * pos_weight
+                neut = element * neut_weight
+                neg = element * neg_weight
                 p_w_pos += pos
                 p_w_neut += neut
                 p_w_neg += neg
         file.write(word + " " + str(round(p_w_pos,3)) + " " + str(round(p_w_neut, 3)) + " " + str(round(p_w_neg, 3)) + "\n")
     file.close()
+
+"""
+#function to format professional sentiment lexicon
+def process_vad_sentiment_lexicon(data):
+    """
+    """
+    As Vader's sentiment lexicon only has positive and negative weights, we will estimate neutral weights by taking the average of the other two weights.
+    The sentiment lexicon will then be saved in the same format as our lexicon, so we can use our algorithms without problems.
+    """
+    """
+    file = open('sentiment_lexicon_vader.txt', 'w')
+    for line in open(data):
+        line_split = line.split()
+        word = line_split[0]
+        pos_weight = float(line_split[1])
+        neg_weight = float(line_split[2])
+        neut_weight = Decimal((pos_weight + neg_weight)) / 2
+        file.write(word + " " + str(round(pos_weight,3)) + " " + str(round(neut_weight,3)) + " " + str(round(neg_weight,3)) + "\n")
+    file.close()
+"""
+
+#function to estimate precision, recall and accuracy of our sentiment analysis
+def analyze(int_data, data):
+    return
+
+#function to visualize our results via plots
+def visualize():
+    return
 
 if __name__ == "__main__":
     #process data of all three data sets
@@ -552,10 +616,22 @@ if __name__ == "__main__":
     data_list_during = process('data/comiccon_during_classified.csv')
     data_list_after = process('data/comiccon_after_classified.csv')
     
+    """
+    data_list_before_2 = process_for_lexicon('data/comiccon_before_classified.csv')
+    data_list_during_2 = process_for_lexicon('data/comiccon_during_classified.csv')
+    data_list_after_2 = process_for_lexicon('data/comiccon_after_classified.csv')
+    """
+    
     #make dictionaries with sentiment of all three data sets
     data_dict_before = make_dictionary('data/comiccon_before_classified.csv', data_list_before)
     data_dict_during = make_dictionary('data/comiccon_during_classified.csv', data_list_during)
     data_dict_after = make_dictionary('data/comiccon_after_classified.csv', data_list_after)
+    
+    """
+    data_dict_before_2 = make_dictionary('data/comiccon_before_classified.csv', data_list_before_2)
+    data_dict_during_2 = make_dictionary('data/comiccon_during_classified.csv', data_list_during_2)
+    data_dict_after_2 = make_dictionary('data/comiccon_after_classified.csv', data_list_after_2)
+    """
     
     #merge data_lists and data_dicts to make sentiment lexicon
     data_list_joined = data_list_before + data_list_during + data_list_after               
@@ -564,10 +640,43 @@ if __name__ == "__main__":
     #create sentiment lexicon (txtfile) based on twitter data
     make_sentiment_lexicon(data_list_joined, data_dict_joined)
     
-    #do_naive_bayes('sentiment_lexicon.txt', data_list_before, 'sentiment_before_naive_bayes.csv')
-    #do_max_ent('sentiment_lexicon.txt', data_list_before, 'sentiment_before_max_ent.csv')
-    #do_svm('sentiment_lexicon.txt', data_list_before, data_dict_before, 'sentiment_before_svm.csv')
-    do_pmi('sentiment_lexicon.txt', data_list_before)
-        
-        
-
+    #do_pmi('sentiment_lexicon.txt', data_list_before)
+    do_pmi('sentiment_lexicon.txt', data_list_joined)
+    
+    """
+    process_vad_sentiment_lexicon('sentiment lexicon/vader_sentiment_lexicon.txt')
+    """
+    
+    #do_naive_bayes('sentiment_lexicon.txt', data_list_before, 'sentiment_before_naive_bayes.csv')                              #o
+    #do_naive_bayes('sentiment_lexicon.txt', data_list_during, 'sentiment_during_naive_bayes.csv')
+    #do_naive_bayes('sentiment_lexicon.txt', data_list_after, 'sentiment_after_naive_bayes.csv')
+    #do_naive_bayes('sentiment_lexicon_pmi.txt', data_list_before, 'sentiment_before_naive_bayes_pmi.csv')                      #o
+    #do_naive_bayes('sentiment_lexicon_vader.txt', data_list_before_2, 'sentiment_before_naive_bayes_vader.csv')                #o
+    #do_naive_bayes('sentiment_lexicon.txt', data_list_joined, 'sentiment_joined_naive_bayes.csv')                              #s                    
+    #do_naive_bayes('sentiment_lexicon_pmi.txt', data_list_joined, 'sentiment_joined_naive_bayes_pmi.csv')                      #s
+    #do_naive_bayes('sentiment_lexicon_vader.txt', data_list_joined, 'sentiment_joined_naive_bayes_vader.csv')                  #s
+    
+    #do_max_ent('sentiment_lexicon.txt', data_list_before, 'sentiment_before_max_ent.csv')                                      #o
+    #do_max_ent('sentiment_lexicon.txt', data_list_during, 'sentiment_during_max_ent.csv')
+    #do_max_ent('sentiment_lexicon.txt', data_list_after, 'sentiment_after_max_ent.csv')
+    #do_max_ent('sentiment_lexicon_pmi.txt', data_list_before, 'sentiment_before_max_ent_pmi.csv')                              #o
+    #do_max_ent('sentiment_lexicon_vader.txt', data_list_before_2, 'sentiment_before_max_ent_vader.csv')                        #o
+    #do_max_ent('sentiment_lexicon.txt', data_list_joined, 'sentiment_joined_max_ent.csv')                                      #s
+    #do_max_ent('sentiment_lexicon_pmi.txt', data_list_joined, 'sentiment_joined_max_ent_pmi.csv')                              #s
+    #do_max_ent('sentiment_lexicon_vader.txt', data_list_joined, 'sentiment_joined_max_ent_vader.csv')                          #s
+    
+    #do_svm('sentiment_lexicon.txt', data_list_before, data_dict_before, 'sentiment_before_svm.csv')                            #o
+    #do_svm('sentiment_lexicon.txt', data_list_during, data_dict_during, 'sentiment_during_svm.csv')
+    #do_svm('sentiment_lexicon.txt', data_list_after, data_dict_after, 'sentiment_after_svm.csv')
+    #do_svm('sentiment_lexicon_pmi.txt', data_list_before, data_dict_before, 'sentiment_before_svm_pmi.csv')                    #o
+    #do_svm('sentiment_lexicon_vader.txt', data_list_before_2, data_dict_before_2, 'sentiment_before_svm_vader.csv')            #o
+    #do_svm('sentiment_lexicon.txt', data_list_joined, data_dict_joined, 'sentiment_joined_svm.csv')                            #s
+    #do_svm('sentiment_lexicon_pmi.txt', data_list_joined, data_dict_joined, 'sentiment_joined_svm_pmi.csv')                    #s
+    #do_svm('sentiment_lexicon_vader.txt', data_list_joined, data_dict_joined, 'sentiment_joined_svm_vader.csv')                #s
+    
+    #info
+    #savefig('foo.png', bbox_inches='tight')
+    #f = open('table.txt', 'w')
+    #f.write(tabulate(table))
+    #f.close()
+    
