@@ -11,11 +11,20 @@ from nltk.stem.snowball import SnowballStemmer
 import math
 from decimal import *
 from tabulate import tabulate
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 
 #global variables (P(class))
 prob_class_pos = 0
 prob_class_neut = 0
 prob_class_neg = 0
+mac_precisions = {}
+mic_precisions = {}
+mac_recalls = {}
+mic_recalls = {}
+mac_accs = {}
+mic_accs = {}
 
 #function to process twitter data (for usage without professional sentiment lexicon --> with stemming)
 def process(data):           
@@ -686,18 +695,30 @@ def analyze(int_data, data, name, filename):
     neg_precision = neg_y_y / Decimal(neg_y_y + neg_n_y)
     mac_precision = (pos_precision + neut_precision + neg_precision) / 3                    #Macroaverage Precision
     mic_precision = y_y / Decimal(y_y + n_y)                                                #Microaverage Precision
+    global mac_precisions
+    mac_precisions[filename] = mac_precision
+    global mic_precisions
+    mic_precisions[filename] = mic_precision
     
     pos_recall = pos_y_y / Decimal(pos_y_y + pos_y_n)
     neut_recall = neut_y_y / Decimal(neut_y_y + neut_y_n)
     neg_recall = neg_y_y / Decimal(neg_y_y + neg_y_n)
     mac_recall = (pos_recall + neut_recall + neg_recall) / 3                                #Macroaverage Recall
     mic_recall = y_y / Decimal(y_y + y_n)                                                   #Microaverage Recall
+    global mac_recalls
+    mac_recalls[filename] = mac_recall
+    global mic_recalls
+    mic_recalls[filename] = mic_recall
     
     pos_acc = (pos_y_y + pos_n_n) / Decimal(pos_y_y + pos_y_n + pos_n_y + pos_n_n)
     neut_acc = (neut_y_y + neut_n_n) / Decimal(neut_y_y + neut_y_n + neut_n_y + neut_n_n)
     neg_acc = (neg_y_y + neg_n_n) / Decimal(neg_y_y + neg_y_n + neg_n_y + neg_n_n)
     mac_acc = (pos_acc + neut_acc + neg_acc) / 3                                            #Microaverage Accuracy
     mic_acc = (y_y + n_n) / Decimal(y_y + y_n + n_y + n_n)                                  #Macroaverage Accuracy
+    global mac_accs
+    mac_accs[filename] = mac_acc
+    global mic_accs
+    mic_accs[filename] = mic_acc
     
     #creating and saving the tables
     file = open(filename, "w")
@@ -732,8 +753,166 @@ def analyze(int_data, data, name, filename):
     file.close()
 
 #function to visualize our results via plots
-def visualize():
-    return
+def visualize(int_data, data, data2, data3, name, name2, name3, filename):
+    """
+    To visualize our results we will create bar charts and pie charts, which will then be saved into one pdffile.
+    """
+    
+    with PdfPages(filename) as pdf:
+        #bar chart to compare the macro- and microaverage precision of Naive Bayes, MaxEnt and SVM
+        num = 3
+        mac_precisions_list = (mac_precisions['analysis_naive_bayes.txt'], mac_precisions['analysis_max_ent.txt'], mac_precisions['analysis_svm.txt'])
+        x_locate = np.arange(num)
+        width = 0.35 
+        fig, ax = plt.subplots()
+        rec = ax.bar(x_locate, mac_precisions_list, width, color='b')
+        mic_precisions_list = (mic_precisions['analysis_naive_bayes.txt'], mic_precisions['analysis_max_ent.txt'], mic_precisions['analysis_svm.txt'])
+        rec2 = ax.bar(x_locate + width, mic_precisions_list, width, color='g')
+        ax.set_title('Macro- and Microaverage Precision of NB, MaxEnt and SVM')
+        ax.set_xticks(x_locate + width)
+        ax.set_xticklabels(('NB', 'MaxEnt', 'SVM'))
+        ax.legend((rec[0], rec2[0]), ('Macroaverage Precision', 'Microaverage Precision'))
+        axes = plt.gca()
+        axes.set_ylim([0,1])
+        pdf.savefig()
+        plt.close()
+        
+        #bar chart to compare the macro- and microaverage recall of Naive Bayes, MaxEnt and SVM
+        mac_recalls_list = (mac_recalls['analysis_naive_bayes.txt'], mac_recalls['analysis_max_ent.txt'], mac_recalls['analysis_svm.txt'])
+        fig, ax = plt.subplots()
+        rec = ax.bar(x_locate, mac_recalls_list, width, color='b')
+        mic_recalls_list = (mic_recalls['analysis_naive_bayes.txt'], mic_recalls['analysis_max_ent.txt'], mic_recalls['analysis_svm.txt'])
+        rec2 = ax.bar(x_locate + width, mic_recalls_list, width, color='g')
+        ax.set_title('Macro- and Microaverage Recall of NB, MaxEnt and SVM')
+        ax.set_xticks(x_locate + width)
+        ax.set_xticklabels(('NB', 'MaxEnt', 'SVM'))
+        ax.legend((rec[0], rec2[0]), ('Macroaverage Recall', 'Microaverage Recall'))
+        axes = plt.gca()
+        axes.set_ylim([0,1])
+        pdf.savefig()
+        plt.close()
+        
+        #bar chart to compare the macro- and microaverage accuracy of Naive Bayes, MaxEnt and SVM
+        mac_accs_list = (mac_accs['analysis_naive_bayes.txt'], mac_accs['analysis_max_ent.txt'], mac_accs['analysis_svm.txt'])
+        fig, ax = plt.subplots()
+        rec = ax.bar(x_locate, mac_accs_list, width, color='b')
+        mic_accs_list = (mic_accs['analysis_naive_bayes.txt'], mic_accs['analysis_max_ent.txt'], mic_accs['analysis_svm.txt'])
+        rec2 = ax.bar(x_locate + width, mic_accs_list, width, color='g')
+        ax.set_title('Macro- and Microaverage Accuracy of NB, MaxEnt and SVM')
+        ax.set_xticks(x_locate + width)
+        ax.set_xticklabels(('NB', 'MaxEnt', 'SVM'))
+        ax.legend((rec[0], rec2[0]), ('Macroaverage Accuracy', 'Microaverage Accuracy'))
+        axes = plt.gca()
+        axes.set_ylim([0,1])
+        pdf.savefig()
+        plt.close()
+        
+        #pie chart to show the proportion between positive, neutral and negative sentiment assigned intellectually
+        pos = 0
+        neut = 0
+        neg = 0
+        with open(int_data, 'r') as csvfile:
+            reader = csv.reader(csvfile, delimiter=';')       
+            for row in reader:
+                if row[0] == 'positiv':
+                    pos += 1
+                elif row[0] == 'neutral':
+                    neut += 1
+                else:
+                    neg += 1
+        p_pos = (pos / Decimal(pos + neut + neg)) * 100
+        p_neut = (neut / Decimal(pos + neut + neg)) * 100
+        p_neg = (neg / Decimal(pos + neut + neg)) * 100
+        labels = ['positive', 'neutral', 'negative']
+        values = [p_pos, p_neut, p_neg]
+        colors = ['yellowgreen', 'gold', 'lightskyblue']
+        plt.pie(values, labels=labels, colors=colors,
+        autopct='%1.1f%%', shadow=True, startangle=90)
+        plt.axis('equal')
+        plt.title('Intellectually Assigned Sentiment', y=1.05)
+        pdf.savefig()
+        plt.close()
+        
+        #pie chart to show the proportion between positive, neutral and negative sentiment assigned by Naive Bayes
+        pos = 0
+        neut = 0
+        neg = 0
+        with open(data, 'r') as csvfile:
+            reader = csv.reader(csvfile, delimiter=';')       
+            for row in reader:
+                if row[0] == 'positiv':
+                    pos += 1
+                elif row[0] == 'neutral':
+                    neut += 1
+                else:
+                    neg += 1
+        p_pos = (pos / Decimal(pos + neut + neg)) * 100
+        p_neut = (neut / Decimal(pos + neut + neg)) * 100
+        p_neg = (neg / Decimal(pos + neut + neg)) * 100
+        labels = ['positive', 'neutral', 'negative']
+        values = [p_pos, p_neut, p_neg]
+        colors = ['yellowgreen', 'gold', 'lightskyblue']
+        plt.pie(values, labels=labels, colors=colors,
+        autopct='%1.1f%%', shadow=True, startangle=90)
+        plt.axis('equal')
+        title = 'Sentiment Assigned by ' + name
+        plt.title(title, y=1.05)
+        pdf.savefig()
+        plt.close()
+        
+        #pie chart to show the proportion between positive, neutral and negative sentiment assigned by MaxEnt
+        pos = 0
+        neut = 0
+        neg = 0
+        with open(data2, 'r') as csvfile:
+            reader = csv.reader(csvfile, delimiter=';')       
+            for row in reader:
+                if row[0] == 'positiv':
+                    pos += 1
+                elif row[0] == 'neutral':
+                    neut += 1
+                else:
+                    neg += 1
+        p_pos = (pos / Decimal(pos + neut + neg)) * 100
+        p_neut = (neut / Decimal(pos + neut + neg)) * 100
+        p_neg = (neg / Decimal(pos + neut + neg)) * 100
+        labels = ['positive', 'neutral', 'negative']
+        values = [p_pos, p_neut, p_neg]
+        colors = ['yellowgreen', 'gold', 'lightskyblue']
+        plt.pie(values, labels=labels, colors=colors,
+        autopct='%1.1f%%', shadow=True, startangle=90)
+        plt.axis('equal')
+        title = 'Sentiment Assigned by ' + name2
+        plt.title(title, y=1.05)
+        pdf.savefig()
+        plt.close()
+        
+        #pie chart to show the proportion between positive, neutral and negative sentiment assigned by SVM
+        pos = 0
+        neut = 0
+        neg = 0
+        with open(data3, 'r') as csvfile:
+            reader = csv.reader(csvfile, delimiter=';')       
+            for row in reader:
+                if row[0] == 'positiv':
+                    pos += 1
+                elif row[0] == 'neutral':
+                    neut += 1
+                else:
+                    neg += 1
+        p_pos = (pos / Decimal(pos + neut + neg)) * 100
+        p_neut = (neut / Decimal(pos + neut + neg)) * 100
+        p_neg = (neg / Decimal(pos + neut + neg)) * 100
+        labels = ['positive', 'neutral', 'negative']
+        values = [p_pos, p_neut, p_neg]
+        colors = ['yellowgreen', 'gold', 'lightskyblue']
+        plt.pie(values, labels=labels, colors=colors,
+        autopct='%1.1f%%', shadow=True, startangle=90)
+        plt.axis('equal')
+        title = 'Sentiment Assigned by ' + name3
+        plt.title(title, y=1.05)
+        pdf.savefig()
+        plt.close()
 
 if __name__ == "__main__":
     #process data of all three data sets
@@ -799,13 +978,13 @@ if __name__ == "__main__":
     #do_svm('sentiment_lexicon_pmi.txt', data_list_joined, data_dict_joined, 'sentiment_joined_svm_pmi.csv')                    #s
     #do_svm('sentiment_lexicon_vader.txt', data_list_joined, data_dict_joined, 'sentiment_joined_svm_vader.csv')                #s
     
-    #analyze('data/comiccon_before_classified.csv', 'sentiment_before_naive_bayes.csv', 'Naive Bayes', 'analysis_naive_bayes.txt')
-    #analyze('data/comiccon_joined_classified.csv', 'sentiment_joined_naive_bayes.csv', 'Naive Bayes', 'analysis_joined_naive_bayes.txt')
-    #analyze('data/comiccon_before_classified.csv', 'sentiment_before_max_ent.csv', 'Max Ent', 'analysis_max_ent.txt')
-    #analyze('data/comiccon_joined_classified.csv', 'sentiment_joined_max_ent.csv', 'Max Ent', 'analysis_joined_max_ent.txt')
-    #analyze('data/comiccon_before_classified.csv', 'sentiment_before_svm.csv', 'SVM', 'analysis_svm.txt')
-    #analyze('data/comiccon_joined_classified.csv', 'sentiment_joined_svm.csv', 'SVM', 'analysis_joined_svm.txt')
+    analyze('data/comiccon_before_classified.csv', 'sentiment_before_naive_bayes.csv', 'Naive Bayes', 'analysis_naive_bayes.txt')
+    analyze('data/comiccon_joined_classified.csv', 'sentiment_joined_naive_bayes.csv', 'Naive Bayes', 'analysis_joined_naive_bayes.txt')
+    analyze('data/comiccon_before_classified.csv', 'sentiment_before_max_ent.csv', 'Max Ent', 'analysis_max_ent.txt')
+    analyze('data/comiccon_joined_classified.csv', 'sentiment_joined_max_ent.csv', 'Max Ent', 'analysis_joined_max_ent.txt')
+    analyze('data/comiccon_before_classified.csv', 'sentiment_before_svm.csv', 'SVM', 'analysis_svm.txt')
+    analyze('data/comiccon_joined_classified.csv', 'sentiment_joined_svm.csv', 'SVM', 'analysis_joined_svm.txt')
     
-    #info
-    #savefig('foo.png', bbox_inches='tight')
+    visualization = 'visualization.pdf'
+    visualize('data/comiccon_before_classified.csv', 'sentiment_before_naive_bayes.csv', 'sentiment_before_max_ent.csv', 'sentiment_before_svm.csv',' Naive Bayes', 'Maximum Entropy', 'Support Vector Machine', visualization)
     
