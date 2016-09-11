@@ -10,6 +10,7 @@ from nltk.tokenize import word_tokenize
 from nltk.stem.snowball import SnowballStemmer
 import math
 from decimal import *
+from tabulate import tabulate
 
 #global variables (P(class))
 prob_class_pos = 0
@@ -261,11 +262,11 @@ def do_naive_bayes(sentiment_lexicon, data_list, filename):
                 neg_value = 0
             values = [pos_value, neut_value, neg_value]
             if max(values) == values[0]:                                                    #determine sentiment (max P(class|tweet))
-                sentiment = "positive"
+                sentiment = "positiv"
             elif max(values) == values[1]:
                 sentiment = "neutral"
             else:
-                sentiment = "negative"
+                sentiment = "negativ"
             tweet = ""
             for word in entry:
                 tweet = tweet + word + " "
@@ -314,11 +315,11 @@ def do_max_ent(sentiment_lexicon, data_list, filename):
             """
             values = [p_pos_tweet, p_neut_tweet, p_neg_tweet]
             if max(values) == values[0]:                                                        #determine sentiment (max P(class|tweet))
-                sentiment = "positive"
+                sentiment = "positiv"
             elif max(values) == values[1]:
                 sentiment = "neutral"
             else:
-                sentiment = "negative"
+                sentiment = "negativ"
             tweet = ""
             for word in entry:
                 tweet = tweet + word + " "
@@ -423,7 +424,7 @@ def do_svm(sentiment_lexicon, data_list, data_dict, filename):
             print n
             n += 1
 
-#function to implement Pointwise Mutual Information algorithm to estimate new weights
+#function to implement Pointwise Mutual Information algorithm to estimate new weights       REDO
 def do_pmi(sentiment_lexicon, data_list):
     """
     We use the Pointwise Mutual Information algorithm to determine new weights for our sentiment lexicon,
@@ -465,7 +466,7 @@ def do_pmi(sentiment_lexicon, data_list):
     print len(vocab_list)
     print len(data_list)
 
-    #create word_word_matrix
+    #create word_word_matrix                                            #ERROS REDO
     word_word_matrix = []
     n = 1
     for tweet in data_list:
@@ -585,12 +586,8 @@ def do_pmi(sentiment_lexicon, data_list):
 """
 #function to format professional sentiment lexicon
 def process_vad_sentiment_lexicon(data):
-    """
-    """
-    As Vader's sentiment lexicon only has positive and negative weights, we will estimate neutral weights by taking the average of the other two weights.
-    The sentiment lexicon will then be saved in the same format as our lexicon, so we can use our algorithms without problems.
-    """
-    """
+    #As Vader's sentiment lexicon only has positive and negative weights, we will estimate neutral weights by taking the average of the other two weights.
+    #The sentiment lexicon will then be saved in the same format as our lexicon, so we can use our algorithms without problems.
     file = open('sentiment_lexicon_vader.txt', 'w')
     for line in open(data):
         line_split = line.split()
@@ -603,8 +600,136 @@ def process_vad_sentiment_lexicon(data):
 """
 
 #function to estimate precision, recall and accuracy of our sentiment analysis
-def analyze(int_data, data):
-    return
+def analyze(int_data, data, name, filename):
+    """
+    To analyze the results of our sentiment analysis we will make use of the gold-system-labels matrix.
+    (gold labels: sentiment assigned intellectually; system labels: sentiment assigned by algorithm)
+    We will check how often our algorithm assigned a positive sentiment to a positive tweet, a neutral sentiment to a positive tweet etc.
+    With these values we can determine the precision, recall and accuracy of our algorithm
+    We will then make tables (confusion matrix, contingency tables, pooled table) of our data and save it as a txtfile.
+    
+    Confusion Matrix:                       Contingency Table (pos):    Pooled Table:
+    NB      |  pos  |   neut   |  neg       pos | yes   | no                | yes   | no
+    -----------------------------------     -------------------         --------------------
+    pos     |       |          |            yes |       |               yes |       |   
+    -----------------------------------     -------------------         --------------------
+    neut    |       |          |            no  |       |               no  |       | 
+    -----------------------------------
+    neg     |       |          | 
+    
+    Macroaverage Precision (C.Tables):      Macroaverage Recall:        Macroaverage Accuracy:
+    Microaverage Precision (P.Table):       Microaverage Recall:        Microaverage Accuracy:
+    """
+    
+    with open(int_data, 'r') as csvfile:
+        int_reader = csv.reader(csvfile, delimiter=';') 
+        int_reader = list(int_reader) 
+        pos_pos = 0                                                     #values for confusion matrix
+        pos_neut = 0                                                    
+        pos_neg = 0
+        neut_pos = 0
+        neut_neut = 0
+        neut_neg = 0
+        neg_pos = 0
+        neg_neut = 0
+        neg_neg = 0
+        with open(data, 'r') as csvfile:
+            reader = csv.reader(csvfile, delimiter=';')  
+            reader = list(reader)   
+            for i, row in enumerate(int_reader):
+                if row[0] == 'positiv':
+                    if reader[i][0] == 'positiv':
+                        pos_pos += 1
+                    elif reader[i][0] == 'neutral':
+                        pos_neut += 1
+                    else:
+                        pos_neg += 1
+                elif row[0] == 'neutral':
+                    if reader[i][0] == 'positiv':
+                        neut_pos += 1
+                    elif reader[i][0] == 'neutral':
+                        neut_neut += 1
+                    else:
+                        neut_neg += 1
+                else:
+                    if reader[i][0] == 'positiv':
+                        neg_pos += 1
+                    elif reader[i][0] == 'neutral':
+                        neg_neut += 1
+                    else:
+                        neg_neg += 1
+    
+    #values for contingency tables
+    pos_y_y = pos_pos                                                                       #gold: positive, system: positive
+    pos_y_n = pos_neut + pos_neg                                                            #gold: positive, system: neutral or negative
+    pos_n_y = neut_pos + neg_pos                                                            #gold: neutral or negative, system: positive
+    pos_n_n = neut_neut + neut_neg + neg_neut + neg_neg                                     #gold: neutral or negative, system: neutral or negative
+    
+    neut_y_y = neut_neut
+    neut_y_n = neut_pos + neut_neg
+    neut_n_y = pos_neut + neg_neut
+    neut_n_n = pos_pos + pos_neg + neg_pos + neg_neg
+    
+    neg_y_y = neg_neg
+    neg_y_n = neg_pos + neg_neut
+    neg_n_y = pos_neg + neut_neg
+    neg_n_n = pos_pos + pos_neut + neut_neut + neut_pos
+    
+    #values for pooled table
+    y_y = pos_y_y + neut_y_y + neg_y_y
+    y_n = pos_y_n + neut_y_n + neg_y_n
+    n_y = pos_n_y + neut_n_y + neut_n_y
+    n_n = pos_n_n + neut_n_n + neg_n_n
+    
+    pos_precision = pos_y_y / Decimal(pos_y_y + pos_n_y)
+    neut_precision = neut_y_y / Decimal(neut_y_y + neut_n_y)
+    neg_precision = neg_y_y / Decimal(neg_y_y + neg_n_y)
+    mac_precision = (pos_precision + neut_precision + neg_precision) / 3                    #Macroaverage Precision
+    mic_precision = y_y / Decimal(y_y + n_y)                                                #Microaverage Precision
+    
+    pos_recall = pos_y_y / Decimal(pos_y_y + pos_y_n)
+    neut_recall = neut_y_y / Decimal(neut_y_y + neut_y_n)
+    neg_recall = neg_y_y / Decimal(neg_y_y + neg_y_n)
+    mac_recall = (pos_recall + neut_recall + neg_recall) / 3                                #Macroaverage Recall
+    mic_recall = y_y / Decimal(y_y + y_n)                                                   #Microaverage Recall
+    
+    pos_acc = (pos_y_y + pos_n_n) / Decimal(pos_y_y + pos_y_n + pos_n_y + pos_n_n)
+    neut_acc = (neut_y_y + neut_n_n) / Decimal(neut_y_y + neut_y_n + neut_n_y + neut_n_n)
+    neg_acc = (neg_y_y + neg_n_n) / Decimal(neg_y_y + neg_y_n + neg_n_y + neg_n_n)
+    mac_acc = (pos_acc + neut_acc + neg_acc) / 3                                            #Microaverage Accuracy
+    mic_acc = (y_y + n_n) / Decimal(y_y + y_n + n_y + n_n)                                  #Macroaverage Accuracy
+    
+    #creating and saving the tables
+    file = open(filename, "w")
+    
+    file.write('Confusion Matrix:' + '\n')
+    confusion_table = [['pos', pos_pos, neut_pos, neg_pos], ['neut', pos_neut, neut_neut, neg_neut], ['neg', pos_neg, neut_neg, neg_neg]]
+    confusion_header = [name, 'pos', 'neut', 'neg']
+    file.write(tabulate(confusion_table, confusion_header, tablefmt="grid") + '\n' + '\n')
+    
+    file.write('Contingency Table Positive:' + '\n')
+    contingency_table_pos = [['yes', pos_y_y, pos_n_y], ['no', pos_y_n, pos_n_n]]
+    contingency_header_pos = ['pos', 'yes', 'no']
+    file.write(tabulate(contingency_table_pos, contingency_header_pos, tablefmt="grid") + '\n' + '\n')
+    
+    file.write('Contingency Table Neutral:' + '\n')
+    contingency_table_neut = [['yes', neut_y_y, neut_n_y], ['no', neut_y_n, neut_n_n]]
+    contingency_header_neut = ['neut', 'yes', 'no']
+    file.write(tabulate(contingency_table_neut, contingency_header_neut, tablefmt="grid") + '\n' + '\n')
+    
+    file.write('Contingency Table Negative:' + '\n')
+    contingency_table_neg = [['yes', neg_y_y, neg_n_y], ['no', neg_y_n, neg_n_n]]
+    contingency_header_neg = ['neg', 'yes', 'no']
+    file.write(tabulate(contingency_table_neg, contingency_header_neg, tablefmt="grid") + '\n' + '\n')
+    
+    file.write('Pooled Table:' + '\n')
+    pooled_table = [['yes', y_y, n_y], ['no', y_n, n_n]]
+    pooled_header = [' ', 'yes', 'no']
+    file.write(tabulate(pooled_table, pooled_header, tablefmt="grid") + '\n' + '\n')
+    
+    file.write('Macroaverage Precision: ' + str(round(mac_precision, 3)) + '     ' + 'Macroaverage Recall: ' + str(round(mac_recall, 3)) + '     ' + 'Macroaverage Accuracy: ' + str(round(mac_acc, 3)) + '\n')
+    file.write('Microaverage Precision: ' + str(round(mic_precision, 3)) + '     ' + 'Microaverage Recall: ' + str(round(mic_recall, 3)) + '     ' + 'Microaverage Accuracy: ' + str(round(mic_acc, 3)))
+    file.close()
 
 #function to visualize our results via plots
 def visualize():
@@ -641,7 +766,7 @@ if __name__ == "__main__":
     make_sentiment_lexicon(data_list_joined, data_dict_joined)
     
     #do_pmi('sentiment_lexicon.txt', data_list_before)
-    do_pmi('sentiment_lexicon.txt', data_list_joined)
+    #do_pmi('sentiment_lexicon.txt', data_list_joined)
     
     """
     process_vad_sentiment_lexicon('sentiment lexicon/vader_sentiment_lexicon.txt')
@@ -674,9 +799,13 @@ if __name__ == "__main__":
     #do_svm('sentiment_lexicon_pmi.txt', data_list_joined, data_dict_joined, 'sentiment_joined_svm_pmi.csv')                    #s
     #do_svm('sentiment_lexicon_vader.txt', data_list_joined, data_dict_joined, 'sentiment_joined_svm_vader.csv')                #s
     
+    #analyze('data/comiccon_before_classified.csv', 'sentiment_before_naive_bayes.csv', 'Naive Bayes', 'analysis_naive_bayes.txt')
+    #analyze('data/comiccon_joined_classified.csv', 'sentiment_joined_naive_bayes.csv', 'Naive Bayes', 'analysis_joined_naive_bayes.txt')
+    #analyze('data/comiccon_before_classified.csv', 'sentiment_before_max_ent.csv', 'Max Ent', 'analysis_max_ent.txt')
+    #analyze('data/comiccon_joined_classified.csv', 'sentiment_joined_max_ent.csv', 'Max Ent', 'analysis_joined_max_ent.txt')
+    #analyze('data/comiccon_before_classified.csv', 'sentiment_before_svm.csv', 'SVM', 'analysis_svm.txt')
+    #analyze('data/comiccon_joined_classified.csv', 'sentiment_joined_svm.csv', 'SVM', 'analysis_joined_svm.txt')
+    
     #info
     #savefig('foo.png', bbox_inches='tight')
-    #f = open('table.txt', 'w')
-    #f.write(tabulate(table))
-    #f.close()
     
