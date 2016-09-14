@@ -68,36 +68,6 @@ def process(data):
         
     return data_list
 
-#function to process twitter data (for usage with professional sentiment lexicon --> without stemming)
-def process_for_lexicon(data):  
-    """
-    If we don't make our own sentiment lexicon, but work with a professional one, we still need to process our data,
-    but we don't have to stem the words (as the sentiment lexicon contains all flexed word form etc.).
-    
-    This function will return a list of lists containing all processed tweets (data_list).
-    """                                        
-    data_list = []                                                                      #collect tweets from csv-data in list
-    punctuation =   ['.', ',', ';', '!', '?', '(', ')', '[', ']',
-                    '&', ':', '-', '/', '\\']                                           #list of english punctuation marks (used in tweets)
-    stopwords = nltk.corpus.stopwords.words("english")                                  #list of stopwords
-    
-    with open(data, 'r') as csvfile:
-        reader = csv.reader(csvfile, delimiter=';')       
-        for row in reader:
-            data_list.append(row[2])
-    
-    for index, element in enumerate(data_list):
-        element = element.lower()                                                       #tweet to lowercase           
-        for mark in punctuation:
-            element = element.replace(mark, '')                                         #delete punctuation marks
-        element = ''.join([i for i in element if not i.isdigit()])                      #delete numbers
-        element = word_tokenize(element)                                                #tokenize tweet
-        element = [w for w in element if w not in stopwords]                            #delete stopwords
-
-        data_list[index] = element
-            
-    return data_list
-
 #function to make dictionaries with data and their sentiment
 def make_dictionary(data, data_list):
     data_dict = {}
@@ -368,7 +338,6 @@ def do_svm(sentiment_lexicon, data_list, data_dict, filename):
     #results when using SVM algorithm will be saved as a csvfile
     with open(filename, 'wb') as new_file:
         writer = csv.writer(new_file, delimiter=';')
-        n = 1
         for init_vector in term_tweet_matrix:                                                       #estimate distances between all the vectors
             distances = []
             vec_len_first = 0
@@ -430,9 +399,7 @@ def do_svm(sentiment_lexicon, data_list, data_dict, filename):
             for word in data_list[k1]:
                 tweet = tweet + word + " "
             writer.writerow([sentiment, tweet])
-            print n
-            n += 1
-
+            
 #function to implement Pointwise Mutual Information algorithm to estimate new weights       REDO
 def do_pmi(sentiment_lexicon, data_list):
     """
@@ -472,34 +439,25 @@ def do_pmi(sentiment_lexicon, data_list):
         line_split = line.split()
         vocab_list.append(line_split[0])
     
-    print len(vocab_list)
-    print len(data_list)
-
-    #create word_word_matrix                                            #ERROS REDO
+    #creating the word_word_matrix, collecting all words the initial word occurs together with in a tweet
     word_word_matrix = []
-    n = 1
-    for tweet in data_list:
-        print n
-        for word in tweet:
-            word_contextword = []
-            for words in data_list:
-                if word in words:
-                    for voc in words:
-                        if voc != word:
-                            word_contextword.append(voc)                                    #list of all words occuring together with initial word in tweets
-            word_contextword_dict = {}                                                      #dictionary of contextwords and their number of occurences with initial word
-            for element in word_contextword:
-                word_contextword_dict[element] = word_contextword.count(element)
-            word_contextword_list = []                                                      #list of occurences of initial word with all other words
-            for vocab in vocab_list:
-                if vocab in word_contextword_dict.keys():
-                    word_contextword_list.append(word_contextword_dict[vocab])
-                else:
-                    word_contextword_list.append(0)
-            word_word_matrix.append(word_contextword_list)                                  #list of word_contextword_lists for all words in our vocabulary
-        n += 1
-    
-    print len(word_word_matrix)
+    for voc in vocab_list:
+        word_contextword = []
+        for tweet in data_list:
+            if voc in tweet:
+                for word in tweet:
+                    if word != voc:
+                        word_contextword.append(word)
+        word_contextword_dict = {}
+        for element in word_contextword:
+            word_contextword_dict[element] = word_contextword.count(element)
+        word_contextword_list = []
+        for vocab in vocab_list:
+            if vocab in word_contextword_dict.keys():
+                word_contextword_list.append(word_contextword_dict[vocab])
+            else:
+                word_contextword_list.append(0)
+        word_word_matrix.append(word_contextword_list)
     
     #replace counts in word_word_matrix with joint probabilities
     all_counts = 0
@@ -520,8 +478,6 @@ def do_pmi(sentiment_lexicon, data_list):
             else:
                 joint_probability = 0
             entry[i] = joint_probability
-    
-    print len(word_word_matrix)
 
     #make a list for all words and their P(w) and P(c)
     probability_lists = []
@@ -535,8 +491,6 @@ def do_pmi(sentiment_lexicon, data_list):
             p_c += element[0]
         probability_list = [voc, p_w, p_c]
         probability_lists.append(probability_list)
-    
-    print len(word_word_matrix)
     
     #make ppmi_matrix containing all ppmi-values for all words with all other words
     ppmi_matrix = []
@@ -557,8 +511,6 @@ def do_pmi(sentiment_lexicon, data_list):
             ppmi = max(pmi, 0)
             ppmi_list.append(ppmi)
         ppmi_matrix.append(ppmi_list)
-    
-    print len(ppmi_matrix)
 
     file = open("sentiment_lexicon_pmi.txt", "w")
     word = ""
@@ -572,10 +524,6 @@ def do_pmi(sentiment_lexicon, data_list):
         p_w_neut = float(line_split[2])
         p_w_neg = float(line_split[3])
         for index, element in enumerate(ppmi_matrix[i]):
-            if index == 0:
-                print index, i
-            elif index == 3707:
-                print index, i
             if element != 0:
                 f = open(sentiment_lexicon)
                 lines = f.readlines()
@@ -591,22 +539,6 @@ def do_pmi(sentiment_lexicon, data_list):
                 p_w_neg += neg
         file.write(word + " " + str(round(p_w_pos,3)) + " " + str(round(p_w_neut, 3)) + " " + str(round(p_w_neg, 3)) + "\n")
     file.close()
-
-"""
-#function to format professional sentiment lexicon
-def process_vad_sentiment_lexicon(data):
-    #As Vader's sentiment lexicon only has positive and negative weights, we will estimate neutral weights by taking the average of the other two weights.
-    #The sentiment lexicon will then be saved in the same format as our lexicon, so we can use our algorithms without problems.
-    file = open('sentiment_lexicon_vader.txt', 'w')
-    for line in open(data):
-        line_split = line.split()
-        word = line_split[0]
-        pos_weight = float(line_split[1])
-        neg_weight = float(line_split[2])
-        neut_weight = Decimal((pos_weight + neg_weight)) / 2
-        file.write(word + " " + str(round(pos_weight,3)) + " " + str(round(neut_weight,3)) + " " + str(round(neg_weight,3)) + "\n")
-    file.close()
-"""
 
 #function to estimate precision, recall and accuracy of our sentiment analysis
 def analyze(int_data, data, name, filename):
@@ -722,6 +654,7 @@ def analyze(int_data, data, name, filename):
     
     #creating and saving the tables
     file = open(filename, "w")
+    file.write(name + ': ' + '\n')
     
     file.write('Confusion Matrix:' + '\n')
     confusion_table = [['pos', pos_pos, neut_pos, neg_pos], ['neut', pos_neut, neut_neut, neg_neut], ['neg', pos_neg, neut_neg, neg_neg]]
@@ -913,78 +846,222 @@ def visualize(int_data, data, data2, data3, name, name2, name3, filename):
         plt.title(title, y=1.05)
         pdf.savefig()
         plt.close()
+        
+        #bar chart to compare the macroaverage results of the algorithms with and without PMI
+        num = 4
+        precisions_list = (mac_precisions['analysis_naive_bayes.txt'], mac_precisions['analysis_naive_bayes_pmi.txt'], mac_precisions['analysis_max_ent.txt'], 
+                            mac_precisions['analysis_max_ent_pmi.txt'])
+        x_locate = np.arange(num)
+        width = 0.3 
+        fig, ax = plt.subplots()
+        rec = ax.bar(x_locate, precisions_list, width, color='b')
+        recalls_list = (mac_recalls['analysis_naive_bayes.txt'], mac_recalls['analysis_naive_bayes_pmi.txt'], mac_recalls['analysis_max_ent.txt'], 
+                        mac_recalls['analysis_max_ent_pmi.txt'])
+        rec2 = ax.bar(x_locate + width, recalls_list, width, color='g')
+        accuracy_list = (mac_accs['analysis_naive_bayes.txt'], mac_accs['analysis_naive_bayes_pmi.txt'], mac_accs['analysis_max_ent.txt'], 
+                        mac_accs['analysis_max_ent_pmi.txt'])
+        rec3 = ax.bar(x_locate + width + width, accuracy_list, width, color='r')
+        ax.set_title('Macroaverage Precision, Recall and Accuracy with and without PMI')
+        ax.set_xticks(x_locate + width)
+        ax.set_xticklabels(('NB', 'NB PMI', 'MaxEnt', 'MaxEnt PMI'))
+        ax.legend((rec[0], rec2[0], rec3[0]), ('Precision', 'Recall', 'Accuracy'))
+        axes = plt.gca()
+        axes.set_ylim([0,1])
+        pdf.savefig()
+        plt.close()
+        
+        #bar chart to compare the microaverage results of the algorithms with and without PMI
+        num = 4
+        precisions_list = (mic_precisions['analysis_naive_bayes.txt'], mic_precisions['analysis_naive_bayes_pmi.txt'], mic_precisions['analysis_max_ent.txt'], 
+                            mic_precisions['analysis_max_ent_pmi.txt'])
+        x_locate = np.arange(num)
+        width = 0.3 
+        fig, ax = plt.subplots()
+        rec = ax.bar(x_locate, precisions_list, width, color='b')
+        recalls_list = (mic_recalls['analysis_naive_bayes.txt'], mic_recalls['analysis_naive_bayes_pmi.txt'], mic_recalls['analysis_max_ent.txt'], 
+                        mic_recalls['analysis_max_ent_pmi.txt'])
+        rec2 = ax.bar(x_locate + width, recalls_list, width, color='g')
+        accuracy_list = (mic_accs['analysis_naive_bayes.txt'], mic_accs['analysis_naive_bayes_pmi.txt'], mic_accs['analysis_max_ent.txt'], 
+                        mic_accs['analysis_max_ent_pmi.txt'])
+        rec3 = ax.bar(x_locate + width + width, accuracy_list, width, color='r')
+        ax.set_title('Microaverage Precision, Recall and Accuracy with and without PMI')
+        ax.set_xticks(x_locate + width)
+        ax.set_xticklabels(('NB', 'NB PMI', 'MaxEnt', 'MaxEnt PMI'))
+        ax.legend((rec[0], rec2[0], rec3[0]), ('Precision', 'Recall', 'Accuracy'))
+        axes = plt.gca()
+        axes.set_ylim([0,1])
+        pdf.savefig()
+        plt.close()
 
 if __name__ == "__main__":
+    #Only the first set of twitter data will be used to ensure the shortest time for processing!
     #process data of all three data sets
     data_list_before = process('data/comiccon_before_classified.csv')
     data_list_during = process('data/comiccon_during_classified.csv')
     data_list_after = process('data/comiccon_after_classified.csv')
-    
-    """
-    data_list_before_2 = process_for_lexicon('data/comiccon_before_classified.csv')
-    data_list_during_2 = process_for_lexicon('data/comiccon_during_classified.csv')
-    data_list_after_2 = process_for_lexicon('data/comiccon_after_classified.csv')
-    """
-    
+    print "Twitter Data processed. Creating Dictionaries."
+
     #make dictionaries with sentiment of all three data sets
     data_dict_before = make_dictionary('data/comiccon_before_classified.csv', data_list_before)
     data_dict_during = make_dictionary('data/comiccon_during_classified.csv', data_list_during)
     data_dict_after = make_dictionary('data/comiccon_after_classified.csv', data_list_after)
+    print "Dictionaries created. Merging."
+
+    #merge data_lists and data_dicts to make sentiment lexicon
+    data_list_joined = data_list_before + data_list_during + data_list_after               
+    data_dict_joined = dict(data_dict_before.items() + data_dict_during.items() + data_dict_after.items())
+    print "Done merging. Creating Sentiment Lexicon."
+    
+    #create sentiment lexicon (txtfile) based on twitter data
+    make_sentiment_lexicon(data_list_joined, data_dict_joined)
+    print "Created Sentiment Lexicon. Creating 2nd Sentiment Lexicon using PMI. This will take approximately 20 minutes."
+
+    #create a second sentiment lexicon using PMI
+    do_pmi('sentiment_lexicon.txt', data_list_joined)
+    print "Created 2nd Sentiment Lexicon. Using Naive Bayes Algorithm."
+    
+    #the results using the algorithms will be saved as a csvfile
+    #use the naive bayes algorithm with and without PMI
+    do_naive_bayes('sentiment_lexicon.txt', data_list_before, 'sentiment_before_naive_bayes.csv')
+    do_naive_bayes('sentiment_lexicon_pmi.txt', data_list_before, 'sentiment_before_naive_bayes_pmi.csv')
+    print "Finished using Naive Bayes. Using Maximum Entropy Algorithm."
+    
+    #use the max ent algorithm with and without PMI
+    do_max_ent('sentiment_lexicon.txt', data_list_before, 'sentiment_before_max_ent.csv')
+    do_max_ent('sentiment_lexicon_pmi.txt', data_list_before, 'sentiment_before_max_ent_pmi.csv')
+    print "Finished using MaxEnt. Using SVM Algorithm. This will take several minutes."
+    
+    #use the svm algorithm
+    do_svm('sentiment_lexicon.txt', data_list_before, data_dict_before, 'sentiment_before_svm.csv')
+    print "Finished using SVM. Analyzing Data."
+    
+    #analyze the results and save the analysis as a txtfile
+    analyze('data/comiccon_before_classified.csv', 'sentiment_before_naive_bayes.csv', 'Naive Bayes', 'analysis_naive_bayes.txt')
+    analyze('data/comiccon_before_classified.csv', 'sentiment_before_naive_bayes_pmi.csv', 'Naive Bayes PMI', 'analysis_naive_bayes_pmi.txt')
+    analyze('data/comiccon_before_classified.csv', 'sentiment_before_max_ent.csv', 'Max Ent', 'analysis_max_ent.txt')
+    analyze('data/comiccon_before_classified.csv', 'sentiment_before_max_ent_pmi.csv', 'Max Ent PMI', 'analysis_max_ent_pmi.txt')
+    analyze('data/comiccon_before_classified.csv', 'sentiment_before_svm.csv', 'SVM', 'analysis_svm.txt')
+    print "Done analyzing. Visualizing Analysis."
+    
+    #visualize the analysis and save it as a pdffile
+    visualization = 'visualization.pdf'
+    visualize('data/comiccon_before_classified.csv', 'sentiment_before_naive_bayes.csv', 'sentiment_before_max_ent.csv', 'sentiment_before_svm.csv', 
+                'Naive Bayes', 'Maximum Entropy', 'Support Vector Machine', visualization)
+    print "Done."
+
+    """
+    ##########################################
+    # Long Version using the Joined Data Set #
+    ##########################################
+    
+    #process data of all three data sets
+    data_list_before = process('data/comiccon_before_classified.csv')
+    data_list_during = process('data/comiccon_during_classified.csv')
+    data_list_after = process('data/comiccon_after_classified.csv')
+    print "Twitter Data processed. Creating Dictionaries."
+
+    #make dictionaries with sentiment of all three data sets
+    data_dict_before = make_dictionary('data/comiccon_before_classified.csv', data_list_before)
+    data_dict_during = make_dictionary('data/comiccon_during_classified.csv', data_list_during)
+    data_dict_after = make_dictionary('data/comiccon_after_classified.csv', data_list_after)
+    print "Dictionaries created. Merging."
+
+    #merge data_lists and data_dicts to make sentiment lexicon
+    data_list_joined = data_list_before + data_list_during + data_list_after               
+    data_dict_joined = dict(data_dict_before.items() + data_dict_during.items() + data_dict_after.items())
+    print "Done merging. Creating Sentiment Lexicon."
+    
+    #create sentiment lexicon (txtfile) based on twitter data
+    make_sentiment_lexicon(data_list_joined, data_dict_joined)
+    print "Created Sentiment Lexicon. Creating 2nd Sentiment Lexicon using PMI. This will take approximately 20 minutes."
+
+    #create a second sentiment lexicon using PMI
+    do_pmi('sentiment_lexicon.txt', data_list_joined)
+    print "Created 2nd Sentiment Lexicon. Using Naive Bayes Algorithm. This will take a couple of minutes."
+    
+    #the results using the algorithms will be saved as a csvfile
+    #use the naive bayes algorithm with and without PMI
+    do_naive_bayes('sentiment_lexicon.txt', data_list_joined, 'sentiment_joined_naive_bayes.csv')
+    do_naive_bayes('sentiment_lexicon_pmi.txt', data_list_joined, 'sentiment_joined_naive_bayes_pmi.csv')
+    print "Finished using Naive Bayes. Using Maximum Entropy Algorithm. This will take a couple of minutes."
+    
+    #use the max ent algorithm with and without PMI
+    do_max_ent('sentiment_lexicon.txt', data_list_joined, 'sentiment_joined_max_ent.csv')
+    do_max_ent('sentiment_lexicon_pmi.txt', data_list_before, 'sentiment_before_max_ent_pmi.csv')
+    print "Finished using MaxEnt. Using SVM Algorithm. This will take approximately an hour."
+    
+    #use the svm algorithm
+    do_svm('sentiment_lexicon.txt', data_list_joined, data_dict_joined, 'sentiment_joined_svm.csv')
+    print "Finished using SVM. Analyzing Data."
+    
+    analyze('data/comiccon_joined_classified.csv', 'sentiment_joined_naive_bayes.csv', 'Naive Bayes', 'analysis_joined_naive_bayes.txt')
+    analyze('data/comiccon_joined_classified.csv', 'sentiment_joined_naive_bayes_pmi.csv', 'Naive Bayes PMI', 'analysis_joined_naive_bayes_pmi.txt')
+    analyze('data/comiccon_joined_classified.csv', 'sentiment_joined_max_ent.csv', 'Max Ent', 'analysis_joined_max_ent.txt')
+    analyze('data/comiccon_joined_classified.csv', 'sentiment_joined_max_ent_pmi.csv', 'Max Ent PMI', 'analysis_joined_max_ent_pmi.txt')
+    analyze('data/comiccon_joined_classified.csv', 'sentiment_joined_svm.csv', 'SVM', 'analysis_joined_svm.txt')
+    print "Done analyzing. Visualizing Analysis."
+    
+    #visualize the analysis and save it as a pdffile
+    visualization = 'visualization_joined.pdf'
+    visualize('data/comiccon_joined_classified.csv', 'sentiment_joined_naive_bayes.csv', 'sentiment_joined_max_ent.csv', 'sentiment_joined_svm.csv', 
+                'Naive Bayes', 'Maximum Entropy', 'Support Vector Machine', visualization)
+    print "Done."
+    """
     
     """
-    data_dict_before_2 = make_dictionary('data/comiccon_before_classified.csv', data_list_before_2)
-    data_dict_during_2 = make_dictionary('data/comiccon_during_classified.csv', data_list_during_2)
-    data_dict_after_2 = make_dictionary('data/comiccon_after_classified.csv', data_list_after_2)
-    """
-    
+    #######################################################
+    # Analyzing the After and During sets of Twitter Data #
+    #######################################################
+    #process data of all three data sets
+    data_list_before = process('data/comiccon_before_classified.csv')
+    data_list_during = process('data/comiccon_during_classified.csv')
+    data_list_after = process('data/comiccon_after_classified.csv')
+
+    #make dictionaries with sentiment of all three data sets
+    data_dict_before = make_dictionary('data/comiccon_before_classified.csv', data_list_before)
+    data_dict_during = make_dictionary('data/comiccon_during_classified.csv', data_list_during)
+    data_dict_after = make_dictionary('data/comiccon_after_classified.csv', data_list_after)
+
     #merge data_lists and data_dicts to make sentiment lexicon
     data_list_joined = data_list_before + data_list_during + data_list_after               
     data_dict_joined = dict(data_dict_before.items() + data_dict_during.items() + data_dict_after.items())
     
     #create sentiment lexicon (txtfile) based on twitter data
     make_sentiment_lexicon(data_list_joined, data_dict_joined)
+
+    #create a second sentiment lexicon using PMI
+    do_pmi('sentiment_lexicon.txt', data_list_joined)
     
-    #do_pmi('sentiment_lexicon.txt', data_list_before)
-    #do_pmi('sentiment_lexicon.txt', data_list_joined)
+    #the results using the algorithms will be saved as a csvfile
+    do_naive_bayes('sentiment_lexicon.txt', data_list_during, 'sentiment_during_naive_bayes.csv')
+    do_naive_bayes('sentiment_lexicon_pmi.txt', data_list_during, 'sentiment_during_naive_bayes_pmi.csv')
+    do_naive_bayes('sentiment_lexicon.txt', data_list_after, 'sentiment_after_naive_bayes.csv')
+    do_naive_bayes('sentiment_lexicon_pmi.txt', data_list_after, 'sentiment_after_naive_bayes_pmi.csv')
+    do_max_ent('sentiment_lexicon.txt', data_list_during, 'sentiment_during_max_ent.csv')
+    do_max_ent('sentiment_lexicon_pmi.txt', data_list_during, 'sentiment_during_max_ent_pmi.csv')
+    do_max_ent('sentiment_lexicon.txt', data_list_after, 'sentiment_after_max_ent.csv')
+    do_max_ent('sentiment_lexicon_pmi.txt', data_list_after, 'sentiment_after_max_ent_pmi.csv')
+    do_svm('sentiment_lexicon.txt', data_list_during, data_dict_during, 'sentiment_during_svm.csv')
+    do_svm('sentiment_lexicon.txt', data_list_after, data_dict_during, 'sentiment_after_svm.csv')
+
+    #analyze the results
+    analyze('data/comiccon_during_classified.csv', 'sentiment_during_naive_bayes.csv', 'Naive Bayes', 'analysis_during_naive_bayes.txt')
+    analyze('data/comiccon_during_classified.csv', 'sentiment_during_naive_bayes_pmi.csv', 'Naive Bayes PMI', 'analysis_during_naive_bayes_pmi.txt')
+    analyze('data/comiccon_during_classified.csv', 'sentiment_during_max_ent.csv', 'Max Ent', 'analysis_during_max_ent.txt')
+    analyze('data/comiccon_during_classified.csv', 'sentiment_during_max_ent_pmi.csv', 'Max Ent PMI', 'analysis_during_max_ent_pmi.txt')
+    analyze('data/comiccon_during_classified.csv', 'sentiment_during_svm.csv', 'SVM', 'analysis_during_svm.txt')
+    analyze('data/comiccon_after_classified.csv', 'sentiment_after_naive_bayes.csv', 'Naive Bayes', 'analysis_after_naive_bayes.txt')
+    analyze('data/comiccon_after_classified.csv', 'sentiment_after_naive_bayes_pmi.csv', 'Naive Bayes PMI', 'analysis_after_naive_bayes_pmi.txt')
+    analyze('data/comiccon_after_classified.csv', 'sentiment_after_max_ent.csv', 'Max Ent', 'analysis_during_max_ent.txt')
+    analyze('data/comiccon_after_classified.csv', 'sentiment_after_max_ent_pmi.csv', 'Max Ent PMI', 'analysis_after_max_ent_pmi.txt')
+    analyze('data/comiccon_after_classified.csv', 'sentiment_after_svm.csv', 'SVM', 'analysis_after_svm.txt')
     
+    #visualize the analysis and save it as a pdffile
+    visualization = 'visualization_during.pdf'
+    visualization2 = 'visualization_after.pdf
+    visualize('data/comiccon_during_classified.csv', 'sentiment_during_naive_bayes.csv', 'sentiment_during_max_ent.csv', 'sentiment_during_svm.csv', 
+                'Naive Bayes', 'Maximum Entropy', 'Support Vector Machine', visualization)
+    visualize('data/comiccon_after_classified.csv', 'sentiment_after_naive_bayes.csv', 'sentiment_after_max_ent.csv', 'sentiment_after_svm.csv', 
+                'Naive Bayes', 'Maximum Entropy', 'Support Vector Machine', visualization2)
     """
-    process_vad_sentiment_lexicon('sentiment lexicon/vader_sentiment_lexicon.txt')
-    """
-    
-    #do_naive_bayes('sentiment_lexicon.txt', data_list_before, 'sentiment_before_naive_bayes.csv')                              #o
-    #do_naive_bayes('sentiment_lexicon.txt', data_list_during, 'sentiment_during_naive_bayes.csv')
-    #do_naive_bayes('sentiment_lexicon.txt', data_list_after, 'sentiment_after_naive_bayes.csv')
-    #do_naive_bayes('sentiment_lexicon_pmi.txt', data_list_before, 'sentiment_before_naive_bayes_pmi.csv')                      #o
-    #do_naive_bayes('sentiment_lexicon_vader.txt', data_list_before_2, 'sentiment_before_naive_bayes_vader.csv')                #o
-    #do_naive_bayes('sentiment_lexicon.txt', data_list_joined, 'sentiment_joined_naive_bayes.csv')                              #s                    
-    #do_naive_bayes('sentiment_lexicon_pmi.txt', data_list_joined, 'sentiment_joined_naive_bayes_pmi.csv')                      #s
-    #do_naive_bayes('sentiment_lexicon_vader.txt', data_list_joined, 'sentiment_joined_naive_bayes_vader.csv')                  #s
-    
-    #do_max_ent('sentiment_lexicon.txt', data_list_before, 'sentiment_before_max_ent.csv')                                      #o
-    #do_max_ent('sentiment_lexicon.txt', data_list_during, 'sentiment_during_max_ent.csv')
-    #do_max_ent('sentiment_lexicon.txt', data_list_after, 'sentiment_after_max_ent.csv')
-    #do_max_ent('sentiment_lexicon_pmi.txt', data_list_before, 'sentiment_before_max_ent_pmi.csv')                              #o
-    #do_max_ent('sentiment_lexicon_vader.txt', data_list_before_2, 'sentiment_before_max_ent_vader.csv')                        #o
-    #do_max_ent('sentiment_lexicon.txt', data_list_joined, 'sentiment_joined_max_ent.csv')                                      #s
-    #do_max_ent('sentiment_lexicon_pmi.txt', data_list_joined, 'sentiment_joined_max_ent_pmi.csv')                              #s
-    #do_max_ent('sentiment_lexicon_vader.txt', data_list_joined, 'sentiment_joined_max_ent_vader.csv')                          #s
-    
-    #do_svm('sentiment_lexicon.txt', data_list_before, data_dict_before, 'sentiment_before_svm.csv')                            #o
-    #do_svm('sentiment_lexicon.txt', data_list_during, data_dict_during, 'sentiment_during_svm.csv')
-    #do_svm('sentiment_lexicon.txt', data_list_after, data_dict_after, 'sentiment_after_svm.csv')
-    #do_svm('sentiment_lexicon_pmi.txt', data_list_before, data_dict_before, 'sentiment_before_svm_pmi.csv')                    #o
-    #do_svm('sentiment_lexicon_vader.txt', data_list_before_2, data_dict_before_2, 'sentiment_before_svm_vader.csv')            #o
-    #do_svm('sentiment_lexicon.txt', data_list_joined, data_dict_joined, 'sentiment_joined_svm.csv')                            #s
-    #do_svm('sentiment_lexicon_pmi.txt', data_list_joined, data_dict_joined, 'sentiment_joined_svm_pmi.csv')                    #s
-    #do_svm('sentiment_lexicon_vader.txt', data_list_joined, data_dict_joined, 'sentiment_joined_svm_vader.csv')                #s
-    
-    analyze('data/comiccon_before_classified.csv', 'sentiment_before_naive_bayes.csv', 'Naive Bayes', 'analysis_naive_bayes.txt')
-    analyze('data/comiccon_joined_classified.csv', 'sentiment_joined_naive_bayes.csv', 'Naive Bayes', 'analysis_joined_naive_bayes.txt')
-    analyze('data/comiccon_before_classified.csv', 'sentiment_before_max_ent.csv', 'Max Ent', 'analysis_max_ent.txt')
-    analyze('data/comiccon_joined_classified.csv', 'sentiment_joined_max_ent.csv', 'Max Ent', 'analysis_joined_max_ent.txt')
-    analyze('data/comiccon_before_classified.csv', 'sentiment_before_svm.csv', 'SVM', 'analysis_svm.txt')
-    analyze('data/comiccon_joined_classified.csv', 'sentiment_joined_svm.csv', 'SVM', 'analysis_joined_svm.txt')
-    
-    visualization = 'visualization.pdf'
-    visualize('data/comiccon_before_classified.csv', 'sentiment_before_naive_bayes.csv', 'sentiment_before_max_ent.csv', 'sentiment_before_svm.csv',' Naive Bayes', 'Maximum Entropy', 'Support Vector Machine', visualization)
-    
+

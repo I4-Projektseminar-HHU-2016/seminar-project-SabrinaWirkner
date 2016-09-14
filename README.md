@@ -2,7 +2,14 @@
 
 Sentiment Analysis with Twitter Data - Comparison of Machine Learning Algorithms
 
-One Paragraph of project description goes here
+A project to assign a sentiment (positive, neutral, negative) to tweets and compare the results with intellectual classification.
+Two sentiment lexica will be created, one with using Pointwise Mutual Information and one without.
+To determine the sentiment the following Machine Learning Algorithms will be used and their results compares:
+- [ ] Naive Bayes
+- [ ] Maximum Entropy Models
+- [ ] Support Vector Machine
+The results will be saved as csvfiles. The analysis of the results of each algorithm will be saved as a txtfile and the visualization with charts as one pdffile.
+
 
 ## Features ##
 
