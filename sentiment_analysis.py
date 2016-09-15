@@ -26,7 +26,7 @@ mic_recalls = {}
 mac_accs = {}
 mic_accs = {}
 
-#function to process twitter data (for usage without professional sentiment lexicon --> with stemming)
+#function to process twitter data
 def process(data):           
     """
     We have three data sets (csvfiles) of twitter data containing the sentiment, date, tweet and hashtags.
