@@ -193,7 +193,7 @@ def do_naive_bayes(sentiment_lexicon, data_list, filename):
     
     For Naive Bayes we need to:
         - estimate P(class|tweet) for every class (positive, neutral, negative) and every tweet
-        - compare the probabilites to find greatest probability and therefore the most suitable sentiment
+        - compare the probabilites to find the greatest probability and therefore the most suitable sentiment
         - save the tweet with the respective sentiment in a csv-file (to later compare it with the manual sentiments)
     
     P(tweet|class) = P(w1|class) * P(w2|class) * ... * P(wn|class)
@@ -287,11 +287,6 @@ def do_max_ent(sentiment_lexicon, data_list, filename):
             p_pos_tweet = Decimal(e_pos_feature_sum) / Decimal(e_pos_feature_sum + e_neut_feature_sum + e_neg_feature_sum)
             p_neut_tweet = Decimal(e_neut_feature_sum) / Decimal(e_pos_feature_sum + e_neut_feature_sum + e_neg_feature_sum)
             p_neg_tweet = Decimal(e_neg_feature_sum) / Decimal(e_pos_feature_sum + e_neut_feature_sum + e_neg_feature_sum)
-            """
-            p_pos_tweet = Decimal(math.e**(float(pos_feature_sum))) / Decimal((math.e**(float(pos_feature_sum))) + math.e**(float(neut_feature_sum)) + math.e**(float(neg_feature_sum)))
-            p_neut_tweet = math.e**(float(neut_feature_sum)) / (math.e**(float(pos_feature_sum)) + math.e**(float(neut_feature_sum)) + math.e**(float(neg_feature_sum)))
-            p_neg_tweet = math.e**(float(neg_feature_sum)) / (math.e**(float(pos_feature_sum)) + math.e**(float(neut_feature_sum)) + math.e**(float(neg_feature_sum)))
-            """
             values = [p_pos_tweet, p_neut_tweet, p_neg_tweet]
             if max(values) == values[0]:                                                        #determine sentiment (max P(class|tweet))
                 sentiment = "positiv"
@@ -311,7 +306,7 @@ def do_svm(sentiment_lexicon, data_list, data_dict, filename):
     We work with our data_list containing all stemmed and processed tweets and our sentiment_lexicon.
     
     First we need to estimate the vectors for each tweet. The values of the vector are the number of times each word of our lexicon appears in our tweet.
-    Then we compare for each tweet its vector with all other vector to find the ones most similar. To do this, we need to estimate the normalized dot product.
+    Then we compare for each tweet its vector with all other vectors to find the ones most similar. To do this, we need to estimate the normalized dot product.
     
     The sentiment of our tweet is estimated by the (intellectually assigned) sentiment of the k tweets with the most similar vector
     (k=3 or k=5, whichever gets the better results).
@@ -404,7 +399,7 @@ def do_svm(sentiment_lexicon, data_list, data_dict, filename):
 def do_pmi(sentiment_lexicon, data_list):
     """
     We use the Pointwise Mutual Information algorithm to determine new weights for our sentiment lexicon,
-    which can then be used for our other methods (Naive Bayes, MEM, SVM).
+    which can then be used for our other methods (Naive Bayes, MEM).
     
     First we have to create a word-word-matrix of our lexicon, which displays how often words occur with each other.
     Usually a distance of around 4 words is used, but as we only have little data, we will count how often a word
@@ -415,7 +410,7 @@ def do_pmi(sentiment_lexicon, data_list):
         multiplied with
         count of all contextwords with word / counts of all contextwords with all words
     For example you have the word "apple" and the contextword "pie". "apple" occurs 2 times with "pie" and 5 times in total with contextwords.
-    All in all 32 occurences of words with contextwords are counted (only count either (apple | pie) or (pie | apple).
+    All in all 32 occurences of words with contextwords are counted (only count either (apple | pie) or (pie | apple)).
     So our algorithm for joint probability would be:
         (2 / 5) * (5 / 32)
     
@@ -512,6 +507,7 @@ def do_pmi(sentiment_lexicon, data_list):
             ppmi_list.append(ppmi)
         ppmi_matrix.append(ppmi_list)
 
+    #make sentiment lexicon
     file = open("sentiment_lexicon_pmi.txt", "w")
     word = ""
     p_w_pos = 0
@@ -686,20 +682,25 @@ def analyze(int_data, data, name, filename):
     file.close()
 
 #function to visualize our results via plots
-def visualize(int_data, data, data2, data3, name, name2, name3, filename):
+def visualize(int_data, data, data2, data3, name, name2, name3, a_name, a_name2, a_name3, a_name4, a_name5, filename):
     """
     To visualize our results we will create bar charts and pie charts, which will then be saved into one pdffile.
     """
     
     with PdfPages(filename) as pdf:
+        """
+        The following solution for creating bar charts (for example line 693 to 708 and the other equivalent code snippets) is
+        based on the code example of the matplotlib. 
+        Link: http://matplotlib.org/examples/api/barchart_demo.html
+        """
         #bar chart to compare the macro- and microaverage precision of Naive Bayes, MaxEnt and SVM
         num = 3
-        mac_precisions_list = (mac_precisions['analysis_naive_bayes.txt'], mac_precisions['analysis_max_ent.txt'], mac_precisions['analysis_svm.txt'])
+        mac_precisions_list = (mac_precisions[a_name], mac_precisions[a_name2], mac_precisions[a_name3])
         x_locate = np.arange(num)
         width = 0.35 
         fig, ax = plt.subplots()
         rec = ax.bar(x_locate, mac_precisions_list, width, color='b')
-        mic_precisions_list = (mic_precisions['analysis_naive_bayes.txt'], mic_precisions['analysis_max_ent.txt'], mic_precisions['analysis_svm.txt'])
+        mic_precisions_list = (mic_precisions[a_name], mic_precisions[a_name2], mic_precisions[a_name3])
         rec2 = ax.bar(x_locate + width, mic_precisions_list, width, color='g')
         ax.set_title('Macro- and Microaverage Precision of NB, MaxEnt and SVM')
         ax.set_xticks(x_locate + width)
@@ -711,10 +712,10 @@ def visualize(int_data, data, data2, data3, name, name2, name3, filename):
         plt.close()
         
         #bar chart to compare the macro- and microaverage recall of Naive Bayes, MaxEnt and SVM
-        mac_recalls_list = (mac_recalls['analysis_naive_bayes.txt'], mac_recalls['analysis_max_ent.txt'], mac_recalls['analysis_svm.txt'])
+        mac_recalls_list = (mac_recalls[a_name], mac_recalls[a_name2], mac_recalls[a_name3])
         fig, ax = plt.subplots()
         rec = ax.bar(x_locate, mac_recalls_list, width, color='b')
-        mic_recalls_list = (mic_recalls['analysis_naive_bayes.txt'], mic_recalls['analysis_max_ent.txt'], mic_recalls['analysis_svm.txt'])
+        mic_recalls_list = (mic_recalls[a_name], mic_recalls[a_name2], mic_recalls[a_name3])
         rec2 = ax.bar(x_locate + width, mic_recalls_list, width, color='g')
         ax.set_title('Macro- and Microaverage Recall of NB, MaxEnt and SVM')
         ax.set_xticks(x_locate + width)
@@ -726,10 +727,10 @@ def visualize(int_data, data, data2, data3, name, name2, name3, filename):
         plt.close()
         
         #bar chart to compare the macro- and microaverage accuracy of Naive Bayes, MaxEnt and SVM
-        mac_accs_list = (mac_accs['analysis_naive_bayes.txt'], mac_accs['analysis_max_ent.txt'], mac_accs['analysis_svm.txt'])
+        mac_accs_list = (mac_accs[a_name], mac_accs[a_name2], mac_accs[a_name3])
         fig, ax = plt.subplots()
         rec = ax.bar(x_locate, mac_accs_list, width, color='b')
-        mic_accs_list = (mic_accs['analysis_naive_bayes.txt'], mic_accs['analysis_max_ent.txt'], mic_accs['analysis_svm.txt'])
+        mic_accs_list = (mic_accs[a_name], mic_accs[a_name2], mic_accs[a_name3])
         rec2 = ax.bar(x_locate + width, mic_accs_list, width, color='g')
         ax.set_title('Macro- and Microaverage Accuracy of NB, MaxEnt and SVM')
         ax.set_xticks(x_locate + width)
@@ -740,6 +741,11 @@ def visualize(int_data, data, data2, data3, name, name2, name3, filename):
         pdf.savefig()
         plt.close()
         
+        """
+        The following solution for creating pie charts (for example line 762 to 773 and the other equivalent code snippets) is
+        based on the code example of the matplotlib. 
+        Link: http://matplotlib.org/examples/pie_and_polar_charts/pie_demo_features.html
+        """
         #pie chart to show the proportion between positive, neutral and negative sentiment assigned intellectually
         pos = 0
         neut = 0
@@ -849,17 +855,17 @@ def visualize(int_data, data, data2, data3, name, name2, name3, filename):
         
         #bar chart to compare the macroaverage results of the algorithms with and without PMI
         num = 4
-        precisions_list = (mac_precisions['analysis_naive_bayes.txt'], mac_precisions['analysis_naive_bayes_pmi.txt'], mac_precisions['analysis_max_ent.txt'], 
-                            mac_precisions['analysis_max_ent_pmi.txt'])
+        precisions_list = (mac_precisions[a_name], mac_precisions[a_name4], mac_precisions[a_name2], 
+                            mac_precisions[a_name5])
         x_locate = np.arange(num)
         width = 0.3 
         fig, ax = plt.subplots()
         rec = ax.bar(x_locate, precisions_list, width, color='b')
-        recalls_list = (mac_recalls['analysis_naive_bayes.txt'], mac_recalls['analysis_naive_bayes_pmi.txt'], mac_recalls['analysis_max_ent.txt'], 
-                        mac_recalls['analysis_max_ent_pmi.txt'])
+        recalls_list = (mac_recalls[a_name], mac_recalls[a_name4], mac_recalls[a_name2], 
+                        mac_recalls[a_name5])
         rec2 = ax.bar(x_locate + width, recalls_list, width, color='g')
-        accuracy_list = (mac_accs['analysis_naive_bayes.txt'], mac_accs['analysis_naive_bayes_pmi.txt'], mac_accs['analysis_max_ent.txt'], 
-                        mac_accs['analysis_max_ent_pmi.txt'])
+        accuracy_list = (mac_accs[a_name], mac_accs[a_name4], mac_accs[a_name2], 
+                        mac_accs[a_name5])
         rec3 = ax.bar(x_locate + width + width, accuracy_list, width, color='r')
         ax.set_title('Macroaverage Precision, Recall and Accuracy with and without PMI')
         ax.set_xticks(x_locate + width)
@@ -872,17 +878,17 @@ def visualize(int_data, data, data2, data3, name, name2, name3, filename):
         
         #bar chart to compare the microaverage results of the algorithms with and without PMI
         num = 4
-        precisions_list = (mic_precisions['analysis_naive_bayes.txt'], mic_precisions['analysis_naive_bayes_pmi.txt'], mic_precisions['analysis_max_ent.txt'], 
-                            mic_precisions['analysis_max_ent_pmi.txt'])
+        precisions_list = (mic_precisions[a_name], mic_precisions[a_name4], mic_precisions[a_name2], 
+                            mic_precisions[a_name5])
         x_locate = np.arange(num)
         width = 0.3 
         fig, ax = plt.subplots()
         rec = ax.bar(x_locate, precisions_list, width, color='b')
-        recalls_list = (mic_recalls['analysis_naive_bayes.txt'], mic_recalls['analysis_naive_bayes_pmi.txt'], mic_recalls['analysis_max_ent.txt'], 
-                        mic_recalls['analysis_max_ent_pmi.txt'])
+        recalls_list = (mic_recalls[a_name], mic_recalls[a_name4], mic_recalls[a_name2], 
+                        mic_recalls[a_name5])
         rec2 = ax.bar(x_locate + width, recalls_list, width, color='g')
-        accuracy_list = (mic_accs['analysis_naive_bayes.txt'], mic_accs['analysis_naive_bayes_pmi.txt'], mic_accs['analysis_max_ent.txt'], 
-                        mic_accs['analysis_max_ent_pmi.txt'])
+        accuracy_list = (mic_accs[a_name], mic_accs[a_name4], mic_accs[a_name2], 
+                        mic_accs[a_name5])
         rec3 = ax.bar(x_locate + width + width, accuracy_list, width, color='r')
         ax.set_title('Microaverage Precision, Recall and Accuracy with and without PMI')
         ax.set_xticks(x_locate + width)
@@ -894,7 +900,12 @@ def visualize(int_data, data, data2, data3, name, name2, name3, filename):
         plt.close()
 
 if __name__ == "__main__":
-    #Only the first set of twitter data will be used to ensure the shortest time for processing!
+    ######################################################
+    # Normal Version using the smallest Twitter Data Set #
+    ######################################################
+    
+    #Only the first set of twitter data (comiccon_before_classified.csv) will be used to ensure the shortest time for processing!
+    
     #process data of all three data sets
     data_list_before = process('data/comiccon_before_classified.csv')
     data_list_during = process('data/comiccon_during_classified.csv')
@@ -946,9 +957,10 @@ if __name__ == "__main__":
     #visualize the analysis and save it as a pdffile
     visualization = 'visualization.pdf'
     visualize('data/comiccon_before_classified.csv', 'sentiment_before_naive_bayes.csv', 'sentiment_before_max_ent.csv', 'sentiment_before_svm.csv', 
-                'Naive Bayes', 'Maximum Entropy', 'Support Vector Machine', visualization)
+                'Naive Bayes', 'Maximum Entropy', 'Support Vector Machine', 'analysis_naive_bayes.txt', 'analysis_max_ent.txt'. 'analysis_svm.txt', 
+                'analysis_naive_bayes_pmi.txt', 'analysis_max_ent_pmi.txt', visualization)
     print "Done."
-
+    
     """
     ##########################################
     # Long Version using the Joined Data Set #
@@ -987,8 +999,8 @@ if __name__ == "__main__":
     
     #use the max ent algorithm with and without PMI
     do_max_ent('sentiment_lexicon.txt', data_list_joined, 'sentiment_joined_max_ent.csv')
-    do_max_ent('sentiment_lexicon_pmi.txt', data_list_before, 'sentiment_before_max_ent_pmi.csv')
-    print "Finished using MaxEnt. Using SVM Algorithm. This will take approximately an hour."
+    do_max_ent('sentiment_lexicon_pmi.txt', data_list_joined, 'sentiment_joined_max_ent_pmi.csv')
+    print "Finished using MaxEnt. Using SVM Algorithm. This will take approximately 1 1/2 hours."
     
     #use the svm algorithm
     do_svm('sentiment_lexicon.txt', data_list_joined, data_dict_joined, 'sentiment_joined_svm.csv')
@@ -1000,11 +1012,12 @@ if __name__ == "__main__":
     analyze('data/comiccon_joined_classified.csv', 'sentiment_joined_max_ent_pmi.csv', 'Max Ent PMI', 'analysis_joined_max_ent_pmi.txt')
     analyze('data/comiccon_joined_classified.csv', 'sentiment_joined_svm.csv', 'SVM', 'analysis_joined_svm.txt')
     print "Done analyzing. Visualizing Analysis."
-    
+
     #visualize the analysis and save it as a pdffile
     visualization = 'visualization_joined.pdf'
     visualize('data/comiccon_joined_classified.csv', 'sentiment_joined_naive_bayes.csv', 'sentiment_joined_max_ent.csv', 'sentiment_joined_svm.csv', 
-                'Naive Bayes', 'Maximum Entropy', 'Support Vector Machine', visualization)
+                'Naive Bayes', 'Maximum Entropy', 'Support Vector Machine', 'analysis_joined_naive_bayes.txt', 'analysis_joined_max_ent.txt',
+                'analysis_joined_svm.txt', 'analysis_joined_naive_bayes_pmi.txt', 'analysis_joined_max_ent_pmi.txt', visualization)
     print "Done."
     """
     
@@ -1016,21 +1029,26 @@ if __name__ == "__main__":
     data_list_before = process('data/comiccon_before_classified.csv')
     data_list_during = process('data/comiccon_during_classified.csv')
     data_list_after = process('data/comiccon_after_classified.csv')
+    print "Twitter Data processed. Creating Dictionaries."
 
     #make dictionaries with sentiment of all three data sets
     data_dict_before = make_dictionary('data/comiccon_before_classified.csv', data_list_before)
     data_dict_during = make_dictionary('data/comiccon_during_classified.csv', data_list_during)
     data_dict_after = make_dictionary('data/comiccon_after_classified.csv', data_list_after)
+    print "Dictionaries created. Merging."
 
     #merge data_lists and data_dicts to make sentiment lexicon
     data_list_joined = data_list_before + data_list_during + data_list_after               
     data_dict_joined = dict(data_dict_before.items() + data_dict_during.items() + data_dict_after.items())
+    print "Done merging. Creating Sentiment Lexicon."
     
     #create sentiment lexicon (txtfile) based on twitter data
     make_sentiment_lexicon(data_list_joined, data_dict_joined)
+    print "Created Sentiment Lexicon. Creating 2nd Sentiment Lexicon using PMI. This will take approximately 20 minutes."
 
     #create a second sentiment lexicon using PMI
     do_pmi('sentiment_lexicon.txt', data_list_joined)
+    print "Created 2nd Sentiment Lexicon. Using Algorithms. This will take over an hour."
     
     #the results using the algorithms will be saved as a csvfile
     do_naive_bayes('sentiment_lexicon.txt', data_list_during, 'sentiment_during_naive_bayes.csv')
@@ -1042,7 +1060,8 @@ if __name__ == "__main__":
     do_max_ent('sentiment_lexicon.txt', data_list_after, 'sentiment_after_max_ent.csv')
     do_max_ent('sentiment_lexicon_pmi.txt', data_list_after, 'sentiment_after_max_ent_pmi.csv')
     do_svm('sentiment_lexicon.txt', data_list_during, data_dict_during, 'sentiment_during_svm.csv')
-    do_svm('sentiment_lexicon.txt', data_list_after, data_dict_during, 'sentiment_after_svm.csv')
+    do_svm('sentiment_lexicon.txt', data_list_after, data_dict_after, 'sentiment_after_svm.csv')
+    print "Finished using Algorithms. Analyzing Data."
 
     #analyze the results
     analyze('data/comiccon_during_classified.csv', 'sentiment_during_naive_bayes.csv', 'Naive Bayes', 'analysis_during_naive_bayes.txt')
@@ -1052,16 +1071,19 @@ if __name__ == "__main__":
     analyze('data/comiccon_during_classified.csv', 'sentiment_during_svm.csv', 'SVM', 'analysis_during_svm.txt')
     analyze('data/comiccon_after_classified.csv', 'sentiment_after_naive_bayes.csv', 'Naive Bayes', 'analysis_after_naive_bayes.txt')
     analyze('data/comiccon_after_classified.csv', 'sentiment_after_naive_bayes_pmi.csv', 'Naive Bayes PMI', 'analysis_after_naive_bayes_pmi.txt')
-    analyze('data/comiccon_after_classified.csv', 'sentiment_after_max_ent.csv', 'Max Ent', 'analysis_during_max_ent.txt')
+    analyze('data/comiccon_after_classified.csv', 'sentiment_after_max_ent.csv', 'Max Ent', 'analysis_after_max_ent.txt')
     analyze('data/comiccon_after_classified.csv', 'sentiment_after_max_ent_pmi.csv', 'Max Ent PMI', 'analysis_after_max_ent_pmi.txt')
     analyze('data/comiccon_after_classified.csv', 'sentiment_after_svm.csv', 'SVM', 'analysis_after_svm.txt')
+    print "Done analyzing. Visualizing Analysis."
     
     #visualize the analysis and save it as a pdffile
     visualization = 'visualization_during.pdf'
-    visualization2 = 'visualization_after.pdf
+    visualization2 = 'visualization_after.pdf'
     visualize('data/comiccon_during_classified.csv', 'sentiment_during_naive_bayes.csv', 'sentiment_during_max_ent.csv', 'sentiment_during_svm.csv', 
-                'Naive Bayes', 'Maximum Entropy', 'Support Vector Machine', visualization)
+                'Naive Bayes', 'Maximum Entropy', 'Support Vector Machine', 'analysis_during_naive_bayes.txt', 'analysis_during_max_ent.txt',
+                'analysis_during_svm.txt', 'analysis_during_naive_bayes_pmi.txt', 'analysis_during_max_ent_pmi.txt', visualization)
     visualize('data/comiccon_after_classified.csv', 'sentiment_after_naive_bayes.csv', 'sentiment_after_max_ent.csv', 'sentiment_after_svm.csv', 
-                'Naive Bayes', 'Maximum Entropy', 'Support Vector Machine', visualization2)
+                'Naive Bayes', 'Maximum Entropy', 'Support Vector Machine', 'analysis_after_naive_bayes.txt', 'analysis_after_max_ent.txt',
+                'analysis_after_svm.txt', 'analysis_after_naive_bayes_pmi.txt', 'analysis_after_max_ent_pmi.txt', visualization2)
+    print "Done."
     """
-

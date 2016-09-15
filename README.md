@@ -1,13 +1,11 @@
-# Project Title
-
-Sentiment Analysis with Twitter Data - Comparison of Machine Learning Algorithms
+# Sentiment Analysis with Twitter Data - Comparison of Machine Learning Algorithms
 
 A project to assign a sentiment (positive, neutral, negative) to tweets and compare the results with intellectual classification.
 Two sentiment lexica will be created, one with using Pointwise Mutual Information and one without.
 To determine the sentiment the following Machine Learning Algorithms will be used and their results compares:
-- [x] Naive Bayes
-- [x] Maximum Entropy Models
-- [x] Support Vector Machine
+* Naive Bayes
+* Maximum Entropy Models
+* Support Vector Machine
 
 The results will be saved as CSVfiles. The analysis of the results of each algorithm will be saved as a TXTfile and the visualization with charts as one PDFfile.
 
@@ -37,7 +35,7 @@ Unfinished / Future Features:
 
 Clone / Download the repository.
 It's important you have the program (sentiment_analysis.py) and the Twitter Data (data).
-If you only wish to have the results, but not run the program yourselve, download the results folder, which contains all CSV-, TXT- and PDFfiles.
+If you only wish to have the results, but not run the program yourself, download the results folder, which contains all CSV-, TXT- and PDFfiles.
 
 ### Prerequisities
 
@@ -69,7 +67,7 @@ If you wish to analyze all Twitter Data (~2000 Tweets):
 3. Start the program
 ```
 
-Everything will be done the same way, but the program will run for over an hour, so it is not the first choice.
+Everything will be done the same way, but the program will run for approximately 2 hours, so it is not the first choice.
 
 If you wish to also analyze the other two data sets (~700 Tweets and ~800 Tweets) seperately:
 
@@ -79,7 +77,7 @@ If you wish to also analyze the other two data sets (~700 Tweets and ~800 Tweets
 3. Start the program
 ```
 
-Everything will be done the same way, but the program will run for quite a while, so it is not the first choice.
+Everything will be done the same way, but the program will run for over an hour, so it is not the first choice.
 
 All three parts of the main function can be run in succession. The files will not be overwritten, as new ones are created.
 
@@ -97,8 +95,6 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 
 ## Acknowledgments
 
-* Hat tip to anyone who's code was used
-* Inspiration
-* etc
+* Code Examples of [Matplotlib](http://matplotlib.org/index.html)
 
 *template inspired by [https://gist.github.com/PurpleBooth/109311bb0361f32d87a2](https://gist.github.com/PurpleBooth/109311bb0361f32d87a2)*
