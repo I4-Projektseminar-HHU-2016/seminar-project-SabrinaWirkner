@@ -1,4 +1,4 @@
-# Sentiment Analysis with Twitter Data - Comparison of Machine Learning Algorithms
+# Sentiment Analysis with Twitter Data - Building a Classifier
 
 A project to assign a sentiment (positive, neutral, negative) to tweets and compare the results with intellectual classification.
 Two sentiment lexica will be created, one with using Pointwise Mutual Information and one without.
