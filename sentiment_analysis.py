@@ -957,7 +957,7 @@ if __name__ == "__main__":
     #visualize the analysis and save it as a pdffile
     visualization = 'visualization.pdf'
     visualize('data/comiccon_before_classified.csv', 'sentiment_before_naive_bayes.csv', 'sentiment_before_max_ent.csv', 'sentiment_before_svm.csv', 
-                'Naive Bayes', 'Maximum Entropy', 'Support Vector Machine', 'analysis_naive_bayes.txt', 'analysis_max_ent.txt'. 'analysis_svm.txt', 
+                'Naive Bayes', 'Maximum Entropy', 'Support Vector Machine', 'analysis_naive_bayes.txt', 'analysis_max_ent.txt', 'analysis_svm.txt', 
                 'analysis_naive_bayes_pmi.txt', 'analysis_max_ent_pmi.txt', visualization)
     print "Done."
     
